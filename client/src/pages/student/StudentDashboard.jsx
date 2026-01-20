@@ -43,13 +43,11 @@ const SidebarButton = ({ icon: Icon, text, onClick, isActive, count, isCollapsed
     <div className="relative">
       <button
         onClick={onClick}
-        className={`group flex items-center w-full rounded-xl text-left font-medium transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg overflow-hidden ${
-          isCollapsed ? 'p-3 justify-center' : 'p-3'
-        } ${
-          isActive
+        className={`group flex items-center w-full rounded-xl text-left font-medium transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg overflow-hidden ${isCollapsed ? 'p-3 justify-center' : 'p-3'
+          } ${isActive
             ? 'bg-blue-600 text-white shadow-lg'
             : 'text-slate-700 hover:bg-white/60 hover:text-blue-600 hover:backdrop-blur-sm'
-        }`}
+          }`}
         title={isCollapsed ? text : ''}
       >
         <Icon className={`w-5 h-5 ${isCollapsed ? '' : 'mr-3'} ${isActive ? 'text-white' : 'text-slate-600 group-hover:text-blue-600'} transition-colors duration-300 flex-shrink-0`} />
@@ -293,15 +291,20 @@ const TeacherCard = ({ teacher, onToggleFavorite }) => {
           <div>
             <h4 className="font-semibold text-slate-800 text-sm">{teacher.name}</h4>
             <p className="text-slate-600 text-xs">{teacher.experience}</p>
+            {teacher.matchBadge?.text && (
+              <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full w-fit">
+                <span>{teacher.matchBadge.emoji}</span>
+                <span>{teacher.matchBadge.text}</span>
+              </div>
+            )}
           </div>
         </div>
         <button
           onClick={() => onToggleFavorite && onToggleFavorite(teacher.id)}
-          className={`p-2 rounded-full transition-all duration-200 ${
-            teacher.isFavorite
-              ? 'text-red-500 bg-red-50 hover:bg-red-100'
-              : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
-          }`}
+          className={`p-2 rounded-full transition-all duration-200 ${teacher.isFavorite
+            ? 'text-red-500 bg-red-50 hover:bg-red-100'
+            : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+            }`}
         >
           <Heart className={`w-4 h-4 ${teacher.isFavorite ? 'fill-current' : ''}`} />
         </button>
@@ -435,7 +438,7 @@ const StudentDashboard = () => {
         fetch(`${API_BASE_URL}/api/profile/favourites`, {
           credentials: 'include'
         }),
-        fetch(`${API_BASE_URL}${API_CONFIG.ENDPOINTS.TEACHERS_LIST}`, {
+        fetch(`${API_BASE_URL}${API_CONFIG.ENDPOINTS.TEACHERS_LIST}?sortByLocation=true`, {
           credentials: 'include'
         })
       ]);
@@ -465,7 +468,8 @@ const StudentDashboard = () => {
       setFavorites(favIds);
 
       const formattedTeachers = formatTeachersForDashboard(teachers, favIds);
-      const randomTeachers = getRandomTeachers(formattedTeachers, 3);
+      // Use top 3 recommended teachers (already sorted by location from backend)
+      const recommendedTeachers = formattedTeachers.slice(0, 3);
 
       const favTeachersData = formattedTeachers.filter(t => favIds.includes(t.id));
 
@@ -485,7 +489,7 @@ const StudentDashboard = () => {
           const sessionDate = new Date(b.date);
           return (sessionDate >= new Date() && (b.status === 'pending' || b.status === 'confirmed'));
         }),
-        recentTeachers: randomTeachers,
+        recentTeachers: recommendedTeachers,
         allSessions: bookings,
         favoriteTeachersData: favTeachersData,
       };
@@ -591,7 +595,9 @@ const StudentDashboard = () => {
         phone: teacher.teacherProfile?.phone,
         location: teacher.teacherProfile?.location || 'India',
         teachingMode: teacher.teacherProfile?.teachingMode || 'hybrid',
-        availability: teacher.teacherProfile?.availability || []
+        availability: teacher.teacherProfile?.availability || [],
+        locationScore: teacher.locationScore,
+        matchBadge: teacher.matchBadge
       };
     });
   };
@@ -684,9 +690,8 @@ const StudentDashboard = () => {
                 <div className="relative">
                   <Link
                     to="/student/messages"
-                    className={`flex items-center w-full rounded-xl text-left font-medium transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg overflow-hidden ${
-                      isSidebarCollapsed ? 'p-3 justify-center' : 'p-3'
-                    } text-slate-700 hover:bg-white/60 hover:text-blue-600 hover:backdrop-blur-sm`}
+                    className={`flex items-center w-full rounded-xl text-left font-medium transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg overflow-hidden ${isSidebarCollapsed ? 'p-3 justify-center' : 'p-3'
+                      } text-slate-700 hover:bg-white/60 hover:text-blue-600 hover:backdrop-blur-sm`}
                     title={isSidebarCollapsed ? 'Messages' : ''}
                   >
                     <MessageSquare className={`w-5 h-5 ${isSidebarCollapsed ? '' : 'mr-3'} text-slate-600 hover:text-blue-600 transition-colors duration-300 flex-shrink-0`} />
@@ -695,11 +700,10 @@ const StudentDashboard = () => {
                     )}
                   </Link>
                   {unreadMessageCount > 0 && (
-                    <span className={`absolute bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border border-white shadow-sm ${
-                      isSidebarCollapsed
-                        ? 'w-4 h-4 -top-1 -right-1'
-                        : 'w-5 h-5 top-2 right-2'
-                    }`}>
+                    <span className={`absolute bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border border-white shadow-sm ${isSidebarCollapsed
+                      ? 'w-4 h-4 -top-1 -right-1'
+                      : 'w-5 h-5 top-2 right-2'
+                      }`}>
                       {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                     </span>
                   )}
@@ -874,7 +878,7 @@ const StudentDashboard = () => {
                 <div className="space-y-6">
                   {dashboardData.allSessions && dashboardData.allSessions.length > 0 ? (
                     dashboardData.allSessions
-                      .filter(session => ['confirmed','pending','completed','complete','reject','rejected'].includes((session.status || '').toLowerCase()))
+                      .filter(session => ['confirmed', 'pending', 'completed', 'complete', 'reject', 'rejected'].includes((session.status || '').toLowerCase()))
                       .sort((a, b) => new Date(a.date) - new Date(b.date))
                       .map(session => (
                         <div key={session.id || session._id} className="overflow-x-auto">
@@ -893,7 +897,7 @@ const StudentDashboard = () => {
                               </div>
                             </div>
                             <div className="mt-2 text-xs font-semibold px-2 py-1 rounded-full w-fit self-start md:self-auto"
-                              style={{backgroundColor: session.status === 'completed' || session.status === 'complete' ? '#d1fae5' : session.status === 'confirmed' ? '#e0e7ff' : session.status === 'pending' ? '#fef9c3' : '#fee2e2', color: session.status === 'completed' || session.status === 'complete' ? '#065f46' : session.status === 'confirmed' ? '#3730a3' : session.status === 'pending' ? '#92400e' : '#991b1b'}}>
+                              style={{ backgroundColor: session.status === 'completed' || session.status === 'complete' ? '#d1fae5' : session.status === 'confirmed' ? '#e0e7ff' : session.status === 'pending' ? '#fef9c3' : '#fee2e2', color: session.status === 'completed' || session.status === 'complete' ? '#065f46' : session.status === 'confirmed' ? '#3730a3' : session.status === 'pending' ? '#92400e' : '#991b1b' }}>
                               {session.status}
                             </div>
                           </div>

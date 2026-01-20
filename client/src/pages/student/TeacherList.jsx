@@ -23,7 +23,7 @@ export default function EnhancedTeacherPlatform() {
   const [bookings, setBookings] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [showFavouritesOnly, setShowFavouritesOnly] = useState(false);
-  
+
   // Load favorites from backend on mount
   useEffect(() => {
     const fetchFavourites = async () => {
@@ -46,7 +46,7 @@ export default function EnhancedTeacherPlatform() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBoard, setFilterBoard] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
-  const [sortBy, setSortBy] = useState("rating");
+  const [sortBy, setSortBy] = useState("location");
   const [viewMode, setViewMode] = useState("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
@@ -70,7 +70,7 @@ export default function EnhancedTeacherPlatform() {
   const checkLoginStatus = useCallback(() => {
     const token = localStorage.getItem('token');
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-   
+
     if (!token || !currentUser.role) {
       console.error('❌ Authentication failed. Redirecting to login...');
       setTimeout(() => navigate('/login'), 2000);
@@ -84,9 +84,9 @@ export default function EnhancedTeacherPlatform() {
     try {
       setLoading(true);
       setError(null);
-     
+
       const token = localStorage.getItem('token');
-     
+
       // Check if user is logged in
       if (!currentUser || !currentUser.role) {
         console.log('❌ No current user found, redirecting to login');
@@ -100,7 +100,8 @@ export default function EnhancedTeacherPlatform() {
       // Use the API config instead of hardcoded URL
       const API_BASE_URL = API_CONFIG.BASE_URL;
 
-      const response = await fetch(`${API_BASE_URL}${API_CONFIG.ENDPOINTS.TEACHERS_LIST}`, {
+      // Always request location-based sorting/data to enable "Near Me" features
+      const response = await fetch(`${API_BASE_URL}${API_CONFIG.ENDPOINTS.TEACHERS_LIST}?sortByLocation=true`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -110,16 +111,16 @@ export default function EnhancedTeacherPlatform() {
 
       if (response.ok) {
         const teachersData = await response.json();
-       
+
         // Format teachers data for the UI
         const formattedTeachers = teachersData.map(teacher => {
           // Handle both possible data structures for subjects
           const subjects = teacher.teacherProfile?.subjectsTaught ||
-                          teacher.teacherProfile?.subjects ||
-                          [];
+            teacher.teacherProfile?.subjects ||
+            [];
           const boards = teacher.teacherProfile?.boardsTaught ||
-                        teacher.teacherProfile?.boards ||
-                        [];
+            teacher.teacherProfile?.boards ||
+            [];
 
           return {
             id: teacher._id || teacher.id,
@@ -141,7 +142,9 @@ export default function EnhancedTeacherPlatform() {
             email: teacher.email,
             phone: teacher.teacherProfile?.phone,
             teachingMode: teacher.teacherProfile?.teachingMode || 'hybrid',
-            profilePicture: teacher.teacherProfile?.photoUrl
+            profilePicture: teacher.teacherProfile?.photoUrl,
+            locationScore: teacher.locationScore,
+            matchBadge: teacher.matchBadge
           };
         });
 
@@ -150,7 +153,7 @@ export default function EnhancedTeacherPlatform() {
       } else {
         const errorText = await response.text();
         console.error('❌ API Error:', response.status, errorText);
-       
+
         if (response.status === 401) {
           console.log('🔑 Token is invalid, removing and redirecting');
           setError('Your session has expired. Please login again.');
@@ -159,15 +162,15 @@ export default function EnhancedTeacherPlatform() {
           }, 2000);
           return;
         }
-       
+
         throw new Error('API request failed');
       }
     } catch (apiError) {
       console.log('⚠️ API not available, trying localStorage fallback...');
-     
+
       // Get all users from localStorage
       const allUsers = JSON.parse(localStorage.getItem('users') || '[]');
-     
+
       // If no users in localStorage but we have a current teacher user, add them
       let usersToCheck = allUsers;
       if (allUsers.length === 0 && currentUser.role === 'teacher' && currentUser.teacherProfile) {
@@ -175,12 +178,12 @@ export default function EnhancedTeacherPlatform() {
         // Also save to localStorage for future use
         localStorage.setItem('users', JSON.stringify([currentUser]));
       }
-     
+
       const listedTeachers = usersToCheck.filter(user => {
         const isTeacher = user.role === 'teacher';
         const hasProfile = user.teacherProfile;
         const isListed = user.teacherProfile?.isListed === true;
-       
+
         return isTeacher && hasProfile && isListed;
       });
 
@@ -196,11 +199,11 @@ export default function EnhancedTeacherPlatform() {
       const formattedTeachers = listedTeachers.map(teacher => {
         // Handle both possible data structures
         const subjects = teacher.teacherProfile?.subjectsTaught ||
-                        teacher.teacherProfile?.subjects ||
-                        [];
+          teacher.teacherProfile?.subjects ||
+          [];
         const boards = teacher.teacherProfile?.boardsTaught ||
-                      teacher.teacherProfile?.boards ||
-                      [];
+          teacher.teacherProfile?.boards ||
+          [];
 
         return {
           id: teacher._id || teacher.id,
@@ -264,6 +267,9 @@ export default function EnhancedTeacherPlatform() {
     // Sorting
     filtered.sort((a, b) => {
       switch (sortBy) {
+        case "location":
+          // Sort by location score (highest first)
+          return (b.locationScore?.score || 0) - (a.locationScore?.score || 0);
         case "rating": return b.rating - a.rating;
         case "experience": return b.experience - a.experience;
         case "fee-low": return a.fee - b.fee;
@@ -350,7 +356,7 @@ export default function EnhancedTeacherPlatform() {
           <p className="text-xl opacity-90 mb-8">
             Discover exceptional educators and transform your learning journey
           </p>
-         
+
           {/* Advanced Search Bar */}
           <div className="max-w-2xl mx-auto relative">
             <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-2 shadow-xl">
@@ -433,6 +439,7 @@ export default function EnhancedTeacherPlatform() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="w-full p-3 bg-white/70 backdrop-blur-sm border border-white/30 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
                 >
+                  <option value="location">Near Me</option>
                   <option value="experience">Most Experienced</option>
                   <option value="fee-low">Price: Low to High</option>
                   <option value="fee-high">Price: High to Low</option>
@@ -477,7 +484,7 @@ export default function EnhancedTeacherPlatform() {
                 </div>
               )}
             </div>
-           
+
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setViewMode("grid")}
@@ -532,9 +539,8 @@ export default function EnhancedTeacherPlatform() {
               {filteredAndSortedTeachers.map((teacher, index) => (
                 <div
                   key={teacher.id}
-                  className={`group bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden hover:border-indigo-200/50 transform hover:-translate-y-2 ${
-                    viewMode === "list" ? "flex" : "flex flex-col h-full"
-                  }`}
+                  className={`group bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden hover:border-indigo-200/50 transform hover:-translate-y-2 ${viewMode === "list" ? "flex" : "flex flex-col h-full"
+                    }`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className={`${viewMode === "list" ? "flex-shrink-0 w-48" : ""} relative`}>
@@ -567,17 +573,23 @@ export default function EnhancedTeacherPlatform() {
                                 className="hover:scale-110 transition-transform duration-200"
                               >
                                 <Heart
-                                  className={`w-5 h-5 ${
-                                    favorites.includes(teacher.id)
+                                  className={`w-5 h-5 ${favorites.includes(teacher.id)
                                       ? "fill-red-500 text-red-500"
                                       : "text-white/70 hover:text-white"
-                                  }`}
+                                    }`}
                                 />
                               </button>
                             </div>
                           </div>
                           <h3 className="text-xl font-bold mb-1">{teacher.name}</h3>
                           <p className="text-white/90 text-sm line-clamp-2">{teacher.bio}</p>
+                          {/* Location Match Badge */}
+                          {teacher.matchBadge && teacher.matchBadge.text && (
+                            <div className="mt-2 inline-flex items-center bg-white/20 backdrop-blur-md px-2 py-1 rounded-full text-xs font-semibold border border-white/30">
+                              <span className="mr-1">{teacher.matchBadge.emoji}</span>
+                              {teacher.matchBadge.text}
+                            </div>
+                          )}
                         </div>
                         {viewMode === "grid" && teacher.rating > 0 && (
                           <div className="mt-4 flex items-center space-x-1">
@@ -594,7 +606,16 @@ export default function EnhancedTeacherPlatform() {
                       <div className={`${viewMode === "list" ? "flex-1 pr-6" : ""}`}>
                         {viewMode === "list" && (
                           <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xl font-bold text-gray-800">{teacher.name}</h3>
+                            <div className="flex items-center space-x-3">
+                              <h3 className="text-xl font-bold text-gray-800">{teacher.name}</h3>
+                              {/* Location Match Badge for List View */}
+                              {teacher.matchBadge && teacher.matchBadge.text && (
+                                <div className="inline-flex items-center bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full text-xs font-semibold border border-indigo-100">
+                                  <span className="mr-1">{teacher.matchBadge.emoji}</span>
+                                  {teacher.matchBadge.text}
+                                </div>
+                              )}
+                            </div>
                             {teacher.rating > 0 && (
                               <div className="flex items-center space-x-1">
                                 <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -679,7 +700,7 @@ export default function EnhancedTeacherPlatform() {
                             <Calendar className="w-4 h-4 group-hover:animate-pulse" />
                             <span>Book Session</span>
                           </button>
-                         
+
                           <button
                             onClick={() => handleMessage(teacher)}
                             className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2 group"
@@ -709,6 +730,6 @@ export default function EnhancedTeacherPlatform() {
           </>
         )}
       </div>
-  </div>
+    </div>
   );
 }
