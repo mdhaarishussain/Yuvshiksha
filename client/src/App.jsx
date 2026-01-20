@@ -1,6 +1,6 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+﻿import { Routes, Route, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { getFromLocalStorage } from './utils/storage';
+import { getUserId } from "./utils/getUserId";
 
 // Payment Pages
 import PaymentPage from "./pages/PaymentPage";
@@ -9,7 +9,6 @@ import PaymentFailed from "./pages/PaymentFailed";
 
 // Shared Components
 import Navbar from "./components/Navbar.jsx";
-import FloatingNavbar from "./components/ui/FloatingNavbar.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { SocketProvider } from "./contexts/SocketContext.jsx";
 import { NotificationProvider } from "./contexts/NotificationContext.jsx";
@@ -53,45 +52,42 @@ function App() {
   const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   const [userId, setUserId] = useState(null);
-
+  
   // Get current user and user ID for socket connection
   useEffect(() => {
-    const loadUserData = () => {
-      const user = getFromLocalStorage('currentUser');
-      console.log('🔍 App.jsx - Loading user for socket:', { user: !!user });
-      if (user) {
-        setCurrentUser(user);
-        // We rely on the _id or id property from the stored user object
-        // as the token is now HttpOnly and not readable by JS.
-        setUserId(user._id || user.id);
-        console.log('🔍 App.jsx - Parsed user:', {
-          id: user._id || user.id,
-          name: user.firstName,
-          role: user.role
-        });
+    const loadUserData = async () => {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('currentUser');
+      console.log('🔍 App.jsx - Loading user for socket:', { token: !!token, user: !!user });
+      
+      if (token && user) {
+        try {
+          const parsedUser = JSON.parse(user);
+          console.log('🔍 App.jsx - Parsed user:', { 
+            id: parsedUser._id, 
+            name: parsedUser.firstName, 
+            role: parsedUser.role 
+          });
+          setCurrentUser(parsedUser);
+          
+          // Try to get user ID from various sources
+          const foundUserId = await getUserId();
+          console.log('🔍 App.jsx - Found userId:', foundUserId);
+          setUserId(foundUserId);
+          
+        } catch (error) {
+          console.error('Error parsing user from localStorage:', error);
+        }
       } else {
-        setCurrentUser(null);
-        setUserId(null);
-        console.log('🔍 App.jsx - No user found in localStorage');
+        console.log('🔍 App.jsx - No token or user found in localStorage');
       }
     };
-
-    // Load user data on component mount
+    
     loadUserData();
-
-    // Set up a listener for storage changes. This is important for
-    // cross-tab synchronization and for reacting to login/logout events.
-    window.addEventListener('storage', loadUserData);
-
-    // Cleanup the event listener
-    return () => {
-      window.removeEventListener('storage', loadUserData);
-    };
-  }, []); // Empty dependency array means this runs only on mount/unmount
+  }, []);
 
   // Define routes where navbar should NOT be shown
   const noNavbarRoutes = [
-    '/',
     '/login',
     '/signup',
     '/student/dashboard',
@@ -113,9 +109,6 @@ function App() {
 
   // Check if current route should show navbar
   const shouldShowNavbar = !noNavbarRoutes.includes(location.pathname);
-  
-  // Landing page uses floating navbar
-  const isLandingPage = location.pathname === '/';
 
   // Debug the userId being passed to SocketProvider
   console.log('🔍 App.jsx - Rendering with userId:', userId, 'from user:', currentUser);
@@ -123,7 +116,6 @@ function App() {
   return (
     <SocketProvider userId={userId}>
       <NotificationProvider>
-        {isLandingPage && <FloatingNavbar />}
         {shouldShowNavbar && <Navbar />}
         <Routes>
           {/* Payment Routes */}

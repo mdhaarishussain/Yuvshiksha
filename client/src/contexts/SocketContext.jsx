@@ -33,13 +33,33 @@ export const SocketProvider = ({ children, userId }) => {
     if (userId) {
       console.log('🔌 Initializing socket connection for user:', userId);
       
-      // The only URL we should use for production is the VITE_BACKEND_URL
-      const socketUrl = import.meta.env.VITE_BACKEND_URL;
+      // Try multiple possible URLs for socket connection
+      const envUrl = import.meta.env.VITE_API_URL;
+      const fallbackUrl = 'http://localhost:5000';
+      const originUrl = window.location.origin.replace(/:\d+$/, ':5000');
+      const protocolUrl = window.location.protocol + '//' + window.location.hostname + ':5000';
+      
+      console.log('🔍 Environment VITE_API_URL:', envUrl);
+      console.log('🔍 Fallback URL:', fallbackUrl);
+      console.log('🔍 Origin URL:', originUrl);
+      console.log('🔍 Protocol URL:', protocolUrl);
+      console.log('🔍 Window location:', window.location.href);
+      
+      const possibleUrls = [envUrl, fallbackUrl, originUrl, protocolUrl].filter(Boolean);
+      const socketUrl = possibleUrls[0] || fallbackUrl;
       
       console.log('🌐 Selected socket URL:', socketUrl);
+      console.log('🔍 All possible URLs:', possibleUrls);
       
-      // We will remove the test fetch call here because the io client handles connectivity
-      // errors on its own and provides more detailed logs.
+      // Test if the server is reachable before creating socket
+      console.log('🔍 Testing server connectivity...');
+      fetch(socketUrl + '/socket.io/')
+        .then(response => {
+          console.log('✅ Server Socket.IO endpoint reachable:', response.status);
+        })
+        .catch(error => {
+          console.error('❌ Server Socket.IO endpoint not reachable:', error);
+        });
       
       const newSocket = io(socketUrl, {
         withCredentials: true,

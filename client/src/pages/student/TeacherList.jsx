@@ -288,12 +288,46 @@ export default function EnhancedTeacherPlatform() {
 
   const handleMessage = (teacher) => {
     // Navigate to messages page with teacher ID
+<<<<<<< HEAD
     navigate('/student/messages', {
       state: {
         selectedTeacherId: teacher._id || teacher.id,
         teacherName: teacher.name || `${teacher.firstName} ${teacher.lastName}`
       }
     });
+=======
+    navigate('/student/messages', { 
+      state: { 
+        selectedTeacherId: teacher._id || teacher.id,
+        teacherName: teacher.name || `${teacher.firstName} ${teacher.lastName}`
+      } 
+    });
+  };
+
+  const submitBooking = () => {
+    if (!bookingForm.date || !bookingForm.time) {
+      setNotification("Please select a date and time.");
+      return;
+    }
+    
+    const newBooking = {
+      id: Date.now(),
+      teacherId: selectedTeacher.id,
+      teacherName: selectedTeacher.name,
+      subject: selectedTeacher.subject,
+      date: bookingForm.date,
+      time: bookingForm.time,
+      duration: bookingForm.duration,
+      message: bookingForm.message,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+
+    setBookings([...bookings, newBooking]);
+    setShowBookingModal(false);
+    setBookingForm({ date: "", time: "", duration: "1", message: "" });
+    setNotification(`Booking request sent to ${selectedTeacher.name}! ðŸŽ‰`);
+>>>>>>> origin/main
   };
 
   const toggleFavorite = async (teacherId) => {
@@ -700,7 +734,11 @@ export default function EnhancedTeacherPlatform() {
                             <Calendar className="w-4 h-4 group-hover:animate-pulse" />
                             <span>Book Session</span>
                           </button>
+<<<<<<< HEAD
 
+=======
+                          
+>>>>>>> origin/main
                           <button
                             onClick={() => handleMessage(teacher)}
                             className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2 group"

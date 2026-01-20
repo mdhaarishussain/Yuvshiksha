@@ -385,6 +385,11 @@ const StudentDashboard = () => {
   const hasFetchedData = useRef(false);
 
   const { unreadCount } = useNotifications();
+<<<<<<< HEAD
+=======
+  
+  // Use message notifications
+>>>>>>> origin/main
   const { unreadMessageCount } = useMessageNotifications();
 
   // FIX: Move handleLogout inside StudentDashboard to avoid ReferenceError
@@ -634,6 +639,7 @@ const StudentDashboard = () => {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-indigo-400/10 to-blue-600/10 rounded-full blur-3xl animate-float-slow"></div>
         </div>
         <div className="relative z-10 flex min-h-screen w-full">
+<<<<<<< HEAD
           <aside className={sidebarClass}>
             <div className="relative z-10 flex flex-col h-full">
               <div className={`flex items-center mb-8 ${isSidebarCollapsed ? 'flex-col space-y-4' : 'justify-between'}`}>
@@ -641,6 +647,207 @@ const StudentDashboard = () => {
                   <Link to="/" className="flex items-center group">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mr-3 transform group-hover:scale-105 transition-all duration-300">
                       <GraduationCap className="w-6 h-6 text-white" />
+=======
+        {/* Sidebar */}
+        <aside className={sidebarClass}>
+          <div className="relative z-10 flex flex-col h-full">
+            {/* Collapse Toggle Button */}
+            <div className={`flex items-center mb-8 ${isSidebarCollapsed ? 'flex-col space-y-4' : 'justify-between'}`}>
+              {!isSidebarCollapsed && (
+                <Link to="/" className="flex items-center group">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mr-3 transform group-hover:scale-105 transition-all duration-300">
+                    <GraduationCap className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors duration-200">Yuvshiksha</h2>
+                    <p className="text-slate-600 text-xs group-hover:text-slate-700 transition-colors duration-200">Student Portal</p>
+                  </div>
+                </Link>
+              )}
+              
+              {isSidebarCollapsed && (
+                <Link to="/" className="group mb-2">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center transform group-hover:scale-105 transition-all duration-300 shadow-lg">
+                    <GraduationCap className="w-7 h-7 text-white" />
+                  </div>
+                </Link>
+              )}
+              
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className={`p-2 rounded-lg hover:bg-white/60 transition-colors duration-200 text-slate-600 hover:text-blue-600 shadow-sm ${isSidebarCollapsed ? 'w-full' : ''}`}
+                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {isSidebarCollapsed ? <ChevronRight className="w-5 h-5 mx-auto" /> : <ChevronLeft className="w-5 h-5" />}
+              </button>
+            </div>
+
+            <nav className={`flex-1 mb-8 overflow-hidden ${isSidebarCollapsed ? 'space-y-3' : 'space-y-2'}`}>
+              <SidebarButton
+                icon={Home}
+                text="Dashboard"
+                onClick={() => setActiveMenuItem('dashboard')}
+                isActive={activeMenuItem === 'dashboard'}
+                isCollapsed={isSidebarCollapsed}
+              />
+              <SidebarButton
+                icon={Calendar}
+                text="My Sessions"
+                onClick={() => setActiveMenuItem('sessions')}
+                isActive={activeMenuItem === 'sessions'}
+                count={dashboardData?.upcomingSessions?.length || 0}
+                isCollapsed={isSidebarCollapsed}
+              />
+              <SidebarButton
+                icon={Bookmark}
+                text="Favorites"
+                onClick={() => setActiveMenuItem('favorites')}
+                isActive={activeMenuItem === 'favorites'}
+                count={dashboardData?.recentTeachers?.filter(t => t.isFavorite).length || 0}
+                isCollapsed={isSidebarCollapsed}
+              />
+              
+              {/* Messages Navigation */}
+              <div className="relative">
+                <Link
+                  to="/student/messages"
+                  className={`flex items-center w-full rounded-xl text-left font-medium transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg overflow-hidden ${
+                    isSidebarCollapsed ? 'p-3 justify-center' : 'p-3'
+                  } text-slate-700 hover:bg-white/60 hover:text-blue-600 hover:backdrop-blur-sm`}
+                  title={isSidebarCollapsed ? 'Messages' : ''}
+                >
+                  <MessageSquare className={`w-5 h-5 ${isSidebarCollapsed ? '' : 'mr-3'} text-slate-600 hover:text-blue-600 transition-colors duration-300 flex-shrink-0`} />
+                  {!isSidebarCollapsed && (
+                    <span className="transition-all duration-300 truncate">Messages</span>
+                  )}
+                </Link>
+                {unreadMessageCount > 0 && (
+                  <span className={`absolute bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border border-white shadow-sm ${
+                    isSidebarCollapsed 
+                      ? 'w-4 h-4 -top-1 -right-1' 
+                      : 'w-5 h-5 top-2 right-2'
+                  }`}>
+                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                  </span>
+                )}
+              </div>
+              
+              {/* Navigation Links */}
+              <div className="border-t border-white/20 pt-4 mt-4">
+                <Link
+                  to="/student/find-teachers"
+                  className={`flex items-center w-full p-3 text-left text-slate-700 hover:bg-white/40 rounded-xl transition-all duration-200 group overflow-hidden ${isSidebarCollapsed ? 'justify-center' : 'space-x-3'}`}
+                  title={isSidebarCollapsed ? 'Find Teachers' : ''}
+                >
+                  <Search className="w-5 h-5 group-hover:text-blue-600 transition-colors duration-200 flex-shrink-0" />
+                  {!isSidebarCollapsed && <span className="group-hover:text-blue-600 transition-colors duration-200 truncate">Find Teachers</span>}
+                </Link>
+                {/* Messages button hidden as per request */}
+              </div>
+            </nav>
+
+            <div className="mt-auto">
+              <button
+                onClick={() => {
+                  // Correctly use the imported setToLocalStorage
+                  setToLocalStorage('currentUser', null); // Clear current user
+                  navigate('/login');
+                }}
+                className={`w-full bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-lg flex items-center justify-center transform hover:scale-[1.02] hover:-translate-y-1 ${isSidebarCollapsed ? 'py-3 px-3' : 'py-3 space-x-2'}`}
+                title={isSidebarCollapsed ? 'Logout' : ''}
+              >
+                <LogOut className={`w-5 h-5 ${isSidebarCollapsed ? '' : ''}`} />
+                {!isSidebarCollapsed && <span>Logout</span>}
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className={mainContentClass}>
+          <MainHeader currentUser={currentUser} />
+
+          {activeMenuItem === 'dashboard' && (
+            <section className="space-y-10">
+              {/* Stat Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard
+                  title="Upcoming Sessions"
+                  value={dashboardData.stats.upcomingSessions}
+                  icon={Calendar}
+                  color="primary"
+                  description="All time"
+                />
+                <StatCard
+                  title="Completed Sessions"
+                  value={dashboardData.stats.completedSessions}
+                  icon={BookCheck}
+                  color="secondary"
+                  description="All time"
+                />
+                <StatCard
+                  title="Favorite Teachers"
+                  value={dashboardData.stats.favoriteTeachers}
+                  icon={Heart}
+                  color="accent"
+                  description="Bookmarked"
+                />
+                <StatCard
+                  title="Total Spent"
+                  value={`₹${dashboardData.stats.totalSpent.toLocaleString()}`}
+                  icon={TrendingUp}
+                  color="success"
+                  description="Learning investment"
+                />
+              </div>
+
+              {/* Upcoming Sessions */}
+              <div className={cardClass}>
+                <h2 className={sectionTitleClass}>
+                  <Calendar className="w-7 h-7 text-purple-600" />
+                  Upcoming Sessions
+                </h2>
+                <SessionDetailModal session={selectedSession} onClose={() => setSelectedSession(null)} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...dashboardData.upcomingSessions]
+                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+                    .map(session => (
+                      <SessionCard key={session.id} session={session} onViewDetail={setSelectedSession} />
+                    ))}
+                </div>
+                {dashboardData.upcomingSessions.length === 0 && (
+                  <div className="text-center py-12">
+                    <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <p className="text-slate-500 text-lg mb-4">No upcoming sessions</p>
+                    <Link 
+                      to="/student/find-teachers"
+                      className="inline-flex items-center bg-gradient-to-r from-purple-600 to-violet-600 text-white px-6 py-3 rounded-xl font-medium hover:from-purple-700 hover:to-violet-700 transition-all duration-200"
+                    >
+                      <Search className="w-5 h-5 mr-2" />
+                      Find Teachers
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Recommended Teachers */}
+              <div className={cardClass}>
+                <h2 className={sectionTitleClass}>
+                  <Users className="w-7 h-7 text-purple-600" />
+                  Recommended Teachers
+                </h2>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-purple-600 mr-2" />
+                    <span className="text-slate-600">Loading teachers...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {dashboardData.recentTeachers.map(teacher => (
+                        <TeacherCard key={teacher.id} teacher={teacher} onToggleFavorite={toggleFavorite} />
+                      ))}
+>>>>>>> origin/main
                     </div>
                     <div>
                       <h2 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors duration-200">Yuvsiksha</h2>

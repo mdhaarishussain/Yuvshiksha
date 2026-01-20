@@ -230,6 +230,12 @@ io.on('connection', (socket) => {
     socket.emit('test_pong', { message: 'Hello from server', timestamp: new Date() });
   });
 
+  // Handle test ping
+  socket.on('test_ping', (data) => {
+    console.log('📡 Received test ping from client:', data);
+    socket.emit('test_pong', { message: 'Hello from server', timestamp: new Date() });
+  });
+
   // Handle joining chat rooms
   socket.on('join_room', (roomId: string) => {
     socket.join(roomId);
