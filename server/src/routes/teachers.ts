@@ -1,39 +1,93 @@
-﻿import express from 'express';
+﻿import { Request, Response, Router } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/authMiddleware';
-import User from '../models/User';
+import User, { UserDocument } from '../models/User';
 import { getListedTeachers } from '../controllers/profile-controller';
 
-const router = express.Router();
+const router = Router();
 
 // Add debug route (temporarily)
 router.get('/debug', authMiddleware, getListedTeachers);
 
-// Get list of all available teachers (PUBLIC - no auth required)
-router.get('/list', async (req, res) => {
+// Get list of all available teachers
+// @ts-ignore - Express type issues
+router.get('/list', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    console.log('ðŸ” API: Getting teacher list...');
-    
+    const { sortByLocation } = req.query;
+
+    // If sorting by location is requested, use the recommendation service
+    // This allows reusing the same endpoint if needed, though /recommended is preferred for extra metadata
+    if (sortByLocation === 'true' && req.user) {
+      console.log('📍 API: Getting location-based recommendations for user:', req.user._id);
+
+      const { getRecommendedTeachers } = await import('../services/recommendationService');
+      const result = await getRecommendedTeachers(req.user._id);
+
+      // Flatten the result to match the expected array structure but include match info
+      const teachers = result.teachers.map(item => {
+        // Safe check for toObject in case the object is slightly different at runtime
+        const teacherAny = item.teacher as any;
+        const teacherObj = typeof teacherAny.toObject === 'function'
+          ? teacherAny.toObject()
+          : item.teacher;
+
+        return {
+          ...teacherObj,
+          locationScore: item.locationScore,
+          matchBadge: item.matchBadge
+        };
+      });
+
+      console.log(`📊 Found ${teachers.length} teachers near ${result.studentLocation.parsed.city || 'user location'}`);
+      return res.json(teachers);
+    }
+
+    console.log('🔍 API: Getting teacher list (standard)...');
+
     const teachers = await User.find({
       role: 'teacher',
       'teacherProfile.isListed': true
     }).select('firstName lastName email teacherProfile');
 
-    console.log(`ðŸ“Š Found ${teachers.length} listed teachers`);
-    
-    // Log each found teacher
+    console.log(`📊 Found ${teachers.length} listed teachers`);
+
+    // Log each found teacher (optional debugging)
+    /*
     teachers.forEach(teacher => {
-      console.log(`âœ… Listed teacher: ${teacher.firstName} ${teacher.lastName} (${teacher.email})`);
+      console.log(`✅ Listed teacher: ${teacher.firstName} ${teacher.lastName} (${teacher.email})`);
     });
+    */
 
     res.json(teachers);
   } catch (error) {
-    console.error('âŒ Error fetching teachers:', error);
+    console.error('❌ Error fetching teachers:', error);
     res.status(500).json({ message: 'Failed to fetch teachers' });
   }
 });
 
+// Get recommended teachers (dedicated endpoint with full metadata)
+// @ts-ignore - Express type issues
+router.get('/recommended', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'User authentication required for recommendations' });
+    }
+
+    console.log('📍 API: Getting recommended teachers for', req.user._id);
+
+    // Dynamically import to ensure no circular dependency issues
+    const { getRecommendedTeachers } = await import('../services/recommendationService');
+    const result = await getRecommendedTeachers(req.user._id);
+
+    // Return the full result structure including student location metadata
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Error fetching recommendations:', error);
+    res.status(500).json({ message: 'Failed to fetch recommendations' });
+  }
+});
+
 // Get specific teacher details
-router.get('/:id', async (req: AuthenticatedRequest, res) => {
+router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const teacher = await User.findOne({
       _id: req.params.id,
@@ -52,7 +106,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
 });
 
 // Get teacher availability for a specific date
-router.get('/:id/availability', authMiddleware, async (req: AuthenticatedRequest, res) => {
+router.get('/:id/availability', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { date } = req.query;
     if (!date) {
@@ -65,17 +119,17 @@ router.get('/:id/availability', authMiddleware, async (req: AuthenticatedRequest
     }
 
     const availability = teacher.teacherProfile.availability || [];
-  // Parse date as yyyy-mm-dd in UTC to avoid timezone issues
-  const [year, month, day] = (date as string).split('-').map(Number);
-  const jsDate = new Date(Date.UTC(year, month - 1, day));
-  const dayOfWeek = jsDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    // Parse date as yyyy-mm-dd in UTC to avoid timezone issues
+    const [year, month, day] = (date as string).split('-').map(Number);
+    const jsDate = new Date(Date.UTC(year, month - 1, day));
+    const dayOfWeek = jsDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 
     // Debug logs
-    console.log('--- Teacher Availability Debug ---');
-    console.log('Requested date:', date);
-    console.log('Computed dayOfWeek:', dayOfWeek);
-    console.log('Teacher availability:', availability);
-    console.log('-------------------------------');
+    // console.log('--- Teacher Availability Debug ---');
+    // console.log('Requested date:', date);
+    // console.log('Computed dayOfWeek:', dayOfWeek);
+    // console.log('Teacher availability:', availability);
+    // console.log('-------------------------------');
 
     // Find the availability for the requested day only
     const slotsForDay = availability.filter(a => a.day === dayOfWeek);
@@ -93,7 +147,7 @@ router.get('/:id/availability', authMiddleware, async (req: AuthenticatedRequest
       // New format: generate user-friendly slots within the available time range
       const start: string = avail.startTime;
       const end: string = avail.endTime;
-      function generateSlots(start: string, end: string): string[] {
+      const generateSlots = (start: string, end: string): string[] => {
         const slotsArr: string[] = [];
         let [sh, sm] = start.split(':').map(Number);
         let [eh, em] = end.split(':').map(Number);
