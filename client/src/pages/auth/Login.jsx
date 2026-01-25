@@ -1,8 +1,8 @@
-﻿import { GoogleLogin } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode";
+import { GoogleLogin } from "@react-oauth/google";
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Eye,
   EyeOff,
@@ -14,25 +14,20 @@ import {
   LogIn,
   Shield,
   AlertTriangle,
-  Smartphone,
-  Chrome,
   Globe,
   ArrowLeft,
-  Home,
+  Sparkles,
+  Sun,
+  Moon,
 } from "lucide-react";
-
-// --- IMPORT THE STORAGE UTILITIES ---
-// Corrected path: storage.js is in client/src/utils/
 import { setToLocalStorage, getFromLocalStorage } from "../../utils/storage";
-
-// Define constants for roles to avoid magic strings
-const USER_ROLES = {
-  STUDENT: "student",
-  TEACHER: "teacher",
-};
 
 const Login = () => {
   const navigate = useNavigate();
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('authTheme');
+    return saved ? saved === 'dark' : true;
+  });
 
   const [formData, setFormData] = useState({
     email: "",
@@ -48,7 +43,6 @@ const Login = () => {
     loginAttempts: 0,
     isLocked: false,
     lockoutTime: 0,
-    showBiometric: false,
     passwordStrength: 0,
     isOnline: true,
     lastLoginTime: null,
@@ -59,64 +53,114 @@ const Login = () => {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // Derive form validity directly from state for better reactivity
   const isFormValid =
     uiState.emailValid &&
     uiState.passwordValid &&
     !uiState.isLocked &&
     uiState.isOnline;
 
-  const inputBaseClasses = `w-full py-3 px-4 border rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all duration-200`;
-  const themeSpecificClasses = `bg-white border-slate-300 text-slate-900`; // Always light theme styles
+  // Theme configuration
+  const theme = isDarkMode ? {
+    bg: 'bg-[#0a0612]',
+    gradientFrom: 'from-[#0a0612]',
+    gradientVia: 'via-[#120a1e]',
+    gradientTo: 'to-[#0a0612]',
+    orbColor1: 'bg-violet-600/20',
+    orbColor2: 'bg-fuchsia-600/15',
+    orbColor3: 'bg-purple-500/10',
+    gridColor: 'rgba(139, 92, 246, 0.3)',
+    particleColor: 'bg-violet-400/60',
+    cardBg: 'bg-white/[0.03]',
+    cardBorder: 'border-white/10',
+    topGlow: 'via-violet-500/50',
+    text: 'text-white',
+    textMuted: 'text-slate-400',
+    textSubtle: 'text-slate-500',
+    inputBg: 'bg-white/[0.03]',
+    inputBorder: 'border-white/10',
+    inputFocusBorder: 'focus:border-violet-500/50',
+    inputFocusRing: 'focus:ring-violet-500/30',
+    inputText: 'text-white',
+    inputPlaceholder: 'placeholder-slate-500',
+    dividerBg: 'bg-[#0a0612]',
+    dividerBorder: 'border-white/10',
+    checkboxBg: 'bg-white/5',
+    checkboxBorder: 'border-white/20',
+    linkColor: 'text-violet-400',
+    linkHover: 'hover:text-violet-300',
+    errorBg: 'bg-red-500/10',
+    errorBorder: 'border-red-500/20',
+    errorText: 'text-red-300',
+    successBorder: 'border-emerald-500/50',
+    successIcon: 'text-emerald-400',
+    disabledBg: 'bg-white/5',
+    disabledText: 'text-slate-500',
+  } : {
+    bg: 'bg-gradient-to-br from-slate-50 via-violet-50 to-purple-50',
+    gradientFrom: 'from-slate-50',
+    gradientVia: 'via-violet-50',
+    gradientTo: 'to-purple-50',
+    orbColor1: 'bg-violet-300/30',
+    orbColor2: 'bg-fuchsia-300/20',
+    orbColor3: 'bg-purple-300/15',
+    gridColor: 'rgba(139, 92, 246, 0.1)',
+    particleColor: 'bg-violet-500/40',
+    cardBg: 'bg-white/80',
+    cardBorder: 'border-violet-100',
+    topGlow: 'via-violet-400/30',
+    text: 'text-slate-900',
+    textMuted: 'text-slate-600',
+    textSubtle: 'text-slate-500',
+    inputBg: 'bg-white',
+    inputBorder: 'border-slate-200',
+    inputFocusBorder: 'focus:border-violet-500',
+    inputFocusRing: 'focus:ring-violet-500/20',
+    inputText: 'text-slate-900',
+    inputPlaceholder: 'placeholder-slate-400',
+    dividerBg: 'bg-white',
+    dividerBorder: 'border-slate-200',
+    checkboxBg: 'bg-white',
+    checkboxBorder: 'border-slate-300',
+    linkColor: 'text-violet-600',
+    linkHover: 'hover:text-violet-700',
+    errorBg: 'bg-red-50',
+    errorBorder: 'border-red-200',
+    errorText: 'text-red-600',
+    successBorder: 'border-emerald-400',
+    successIcon: 'text-emerald-500',
+    disabledBg: 'bg-slate-100',
+    disabledText: 'text-slate-400',
+  };
 
-  const getPasswordStrengthColor = useCallback(() => {
-    if (uiState.passwordStrength <= 1) return "bg-red-500 text-red-500";
-    if (uiState.passwordStrength <= 2) return "bg-orange-500 text-orange-500";
-    if (uiState.passwordStrength <= 3) return "bg-yellow-500 text-yellow-500";
-    if (uiState.passwordStrength <= 4) return "bg-blue-500 text-blue-500";
-    return "bg-green-500 text-green-500";
-  }, [uiState.passwordStrength]);
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    localStorage.setItem('authTheme', newTheme ? 'dark' : 'light');
+  };
 
-  const getPasswordStrengthText = useCallback(() => {
-    if (uiState.passwordStrength <= 1) return "Weak";
-    if (uiState.passwordStrength <= 2) return "Fair";
-    if (uiState.passwordStrength <= 3) return "Good";
-    if (uiState.passwordStrength <= 4) return "Strong";
-    return "Very Strong";
-  }, [uiState.passwordStrength]);
-
-  // Initial setup effects
+  // Effects
   useEffect(() => {
-    const biometricAvailable =
-      "webauthn" in window || navigator.userAgent.includes("Mobile");
     const lastLogin = getFromLocalStorage("lastLoginTime", null);
-
     setUiState((u) => ({
       ...u,
-      showBiometric: biometricAvailable,
       lastLoginTime: lastLogin ? new Date(lastLogin) : null,
     }));
   }, []);
 
-  // Handle online/offline status
   useEffect(() => {
     const handleOnline = () => setUiState((u) => ({ ...u, isOnline: true }));
     const handleOffline = () => setUiState((u) => ({ ...u, isOnline: false }));
-
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
-  // Handle Caps Lock warning
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (uiState.focusedField === "password") {
-        // Only check for password field
         const capsLock = e.getModifierState && e.getModifierState("CapsLock");
         if (typeof capsLock === "boolean") {
           setUiState((u) => ({ ...u, showCapsLockWarning: capsLock }));
@@ -127,9 +171,8 @@ const Login = () => {
     };
     document.addEventListener("keydown", handleKeyPress);
     return () => document.removeEventListener("keydown", handleKeyPress);
-  }, [uiState.focusedField]); // Depend on focusedField
+  }, [uiState.focusedField]);
 
-  // Account lockout timer
   useEffect(() => {
     if (uiState.lockoutTime > 0) {
       const timer = setTimeout(() => {
@@ -146,7 +189,6 @@ const Login = () => {
     }
   }, [uiState.lockoutTime, uiState.isLocked]);
 
-  // Validate form data and calculate password strength
   useEffect(() => {
     const emailValid = emailRegex.test(formData.email);
     const passwordValid = formData.password.length >= 6;
@@ -154,21 +196,8 @@ const Login = () => {
       ...u,
       emailValid,
       passwordValid,
-      passwordStrength: formData.password
-        ? calculatePasswordStrength(formData.password)
-        : 0,
     }));
   }, [formData.email, formData.password]);
-
-  const calculatePasswordStrength = (password) => {
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[^A-Za-z0-9]/.test(password)) strength++;
-    return strength;
-  };
 
   const handleInputChange = useCallback(
     ({ target: { name, value, type, checked } }) => {
@@ -188,8 +217,7 @@ const Login = () => {
       if (!isFormValid || uiState.isLocked || uiState.isSubmitting) {
         setUiState((u) => ({
           ...u,
-          errorMessage:
-            "Please ensure all fields are valid and account is not locked.",
+          errorMessage: "Please ensure all fields are valid.",
         }));
         return;
       }
@@ -197,49 +225,33 @@ const Login = () => {
       setUiState((u) => ({ ...u, isSubmitting: true, errorMessage: "" }));
 
       try {
-        const response = await fetch('http://localhost:5000/api/auth/login', {
+        const response = await fetch(import.meta.env.VITE_BACKEND_URL + '/api/auth/login', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email: formData.email, password: formData.password })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, password: formData.password }),
+          credentials: 'include'
         });
 
         const data = await response.json();
 
         if (response.ok) {
-          // Save token and user data
-          setToLocalStorage('token', data.token);
           setToLocalStorage('currentUser', data.user);
           setToLocalStorage('lastLoginTime', new Date());
 
-          // Navigate based on profile completion
           if (data.user.role === 'student') {
-            if (data.user.profileComplete) {
-              navigate('/student/dashboard');
-            } else {
-              navigate('/student/profile');
-            }
+            navigate(data.user.profileComplete ? '/student/dashboard' : '/student/profile');
           } else if (data.user.role === 'teacher') {
-            if (data.user.profileComplete) {
-              navigate('/teacher/dashboard');
-            } else {
-              navigate('/teacher/profile');
-            }
+            navigate(data.user.profileComplete ? '/teacher/dashboard' : '/teacher/profile-setup');
           } else {
             navigate('/');
           }
 
-          // Reset form
           setFormData({ email: '', password: '', rememberMe: false });
         } else {
-          const message = data.message || 'Login failed. Please try again.';
-          throw new Error(message);
+          throw new Error(data.message || 'Login failed. Please try again.');
         }
       } catch (error) {
         const message = error.message || 'Login failed. Please try again.';
-        console.error('Login error:', message);
-
         setUiState((u) => {
           const newAttempts = u.loginAttempts + 1;
           if (newAttempts >= 3) {
@@ -256,8 +268,7 @@ const Login = () => {
               ...u,
               isSubmitting: false,
               loginAttempts: newAttempts,
-              errorMessage:
-                message + (newAttempts === 2 ? ' 1 attempt remaining.' : ''),
+              errorMessage: message + (newAttempts === 2 ? ' 1 attempt remaining.' : ''),
             };
           }
         });
@@ -266,12 +277,9 @@ const Login = () => {
     [formData, isFormValid, navigate, uiState.isLocked, uiState.isSubmitting]
   );
 
-  const handleSocialLogin = useCallback(
-    async (type, credentialResponse) => {
-      if (
-        type === "google" &&
-        (!credentialResponse || !credentialResponse.credential)
-      ) {
+  const handleGoogleLogin = useCallback(
+    async (credentialResponse) => {
+      if (!credentialResponse?.credential) {
         setUiState((u) => ({
           ...u,
           isSubmitting: false,
@@ -283,519 +291,383 @@ const Login = () => {
       setUiState((u) => ({ ...u, isSubmitting: true, errorMessage: "" }));
 
       try {
-        if (type === "google") {
-          // Send the Google credential to your backend
-          const response = await axios.post(
-            "http://localhost:5000/api/auth/google",
-            {
-              credential: credentialResponse.credential,
-            }
-          );
+        const response = await axios.post(
+          import.meta.env.VITE_BACKEND_URL + '/api/auth/google',
+          { credential: credentialResponse.credential },
+          { withCredentials: true }
+        );
 
-          const { token, user } = response.data;
+        const { user } = response.data;
+        setToLocalStorage("currentUser", user);
+        setToLocalStorage("lastLoginTime", new Date());
 
-          // Store user data and token
-          setToLocalStorage("currentUser", user);
-          setToLocalStorage("token", token);
-          setToLocalStorage("lastLoginTime", new Date());
+        const redirectPath = user.profileComplete
+          ? `/${user.role}/dashboard`
+          : `/${user.role}/profile-setup`;
 
-          // Redirect based on role and profile completion
-          const redirectPath = user.profileComplete
-            ? `/${user.role}/dashboard`
-            : `/${user.role}/profile-setup`;
-
-          navigate(redirectPath);
-        } else if (type === "biometric") {
-          // Keep existing biometric login logic
-          await new Promise((r) => setTimeout(r, 1500));
-
-          const mockUserData = {
-            email: "biometric@example.com",
-            role: USER_ROLES.STUDENT,
-            profileComplete: false,
-            firstName: "Biometric",
-            lastName: "User",
-            id: "biometric-user-" + Math.random().toString(36).substr(2, 9),
-          };
-
-          setToLocalStorage("currentUser", mockUserData);
-          setToLocalStorage("lastLoginTime", new Date());
-
-          navigate(`/${mockUserData.role}/profile-setup`);
-        }
+        navigate(redirectPath);
       } catch (error) {
-        console.error(`${type} login error:`, error);
         setUiState((u) => ({
           ...u,
           isSubmitting: false,
-          errorMessage: error.response?.data?.message || `${type} login failed`,
+          errorMessage: error.response?.data?.message || "Google login failed",
         }));
       }
     },
     [navigate]
   );
 
-  const handleGoogleLogin = async (credentialResponse) => {
-    if (!credentialResponse || !credentialResponse.credential) {
-      setUiState((u) => ({
-        ...u,
-        isSubmitting: false,
-        errorMessage: "Invalid Google login response",
-      }));
-      return;
-    }
-
-    try {
-      setUiState((u) => ({ ...u, isSubmitting: true, errorMessage: "" }));
-
-      const response = await axios.post(
-        "http://localhost:5000/api/auth/google",
-        {
-          credential: credentialResponse.credential,
-        }
-      );
-
-      const { token, user } = response.data;
-
-      // Store user data and token
-      setToLocalStorage("currentUser", user);
-      setToLocalStorage("token", token);
-      setToLocalStorage("lastLoginTime", new Date());
-
-      // Redirect based on role and profile completion (match normal login)
-      if (user.role === 'student') {
-        if (user.profileComplete) {
-          navigate('/student/dashboard');
-        } else {
-          navigate('/student/profile');
-        }
-      } else if (user.role === 'teacher') {
-        if (user.profileComplete) {
-          navigate('/teacher/dashboard');
-        } else {
-          navigate('/teacher/profile');
-        }
-      } else {
-        navigate('/');
-      }
-    } catch (error) {
-      setUiState((u) => ({
-        ...u,
-        isSubmitting: false,
-        errorMessage: error.response?.data?.message || "Google login failed",
-      }));
-    }
-  };
-
-  // Changed to directly navigate to a dedicated Forgot Password route
-  const handleForgotPasswordClick = useCallback(() => {
-    navigate("/forgot-password"); // Assuming you have a /forgot-password route
-  }, [navigate]);
-
-  const renderInput = useCallback(
-    (label, name, type = "text", icon = null, toggleable = false) => {
-      const val = formData[name];
-      const isFocused = uiState.focusedField === name;
-      const isValid =
-        name === "email"
-          ? uiState.emailValid
-          : name === "password"
-          ? uiState.passwordValid
-          : true;
-      const hasError = !isValid && val;
-
-      const errorMessages = {
-        email: "Please enter a valid email address",
-        password: "Password must be at least 6 characters",
-      };
-      const errorMessage = hasError ? errorMessages[name] : "";
-
-      return (
-        <div className="space-y-2 transform hover:scale-[1.02] transition-all duration-300">
-          <label
-            className={`flex items-center gap-2 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:text-violet-600`}
-          >
-            {icon && (
-              <span className="text-violet-500 transition-transform duration-200 hover:scale-110">
-                {icon}
-              </span>
-            )}
-            {label} <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type={
-                toggleable ? (uiState.showPassword ? "text" : "password") : type
-              }
-              name={name}
-              value={val}
-              onChange={handleInputChange}
-              onFocus={() => setUiState((u) => ({ ...u, focusedField: name }))}
-              onBlur={() =>
-                setUiState((u) => ({
-                  ...u,
-                  focusedField: null,
-                  showCapsLockWarning: false,
-                }))
-              }
-              className={`${inputBaseClasses} ${themeSpecificClasses} ${
-                hasError
-                  ? "border-red-400 bg-red-50 hover:shadow-red-100"
-                  : isValid && val
-                  ? "border-emerald-400 bg-emerald-50 hover:shadow-emerald-100"
-                  : isFocused
-                  ? "border-violet-400 bg-violet-50 shadow-violet-100"
-                  : ""
-              }`}
-              placeholder={`Enter your ${label.toLowerCase()}`}
-              disabled={uiState.isLocked || uiState.isSubmitting}
-              aria-invalid={hasError ? "true" : "false"}
-              aria-describedby={hasError ? `${name}-error` : undefined}
-            />
-
-            {toggleable && (
-              <button
-                type="button"
-                onClick={() =>
-                  setUiState((u) => ({ ...u, showPassword: !u.showPassword }))
-                }
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-600 transition-all duration-200 transform hover:scale-110 hover:bg-violet-50 rounded-full p-1"
-                disabled={uiState.isLocked || uiState.isSubmitting}
-                aria-label={
-                  uiState.showPassword ? "Hide password" : "Show password"
-                }
-              >
-                {uiState.showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
-              </button>
-            )}
-            {val && !toggleable && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 transform hover:scale-110 transition-transform duration-200">
-                {isValid ? (
-                  <Check className="w-5 h-5 text-emerald-500" />
-                ) : (
-                  <X className="w-5 h-5 text-red-500" />
-                )}
-              </div>
-            )}
-          </div>
-
-          {name === "password" && val && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      getPasswordStrengthColor().split(" ")[0]
-                    }`}
-                    style={{
-                      width: `${(uiState.passwordStrength / 5) * 100}%`,
-                    }}
-                  ></div>
-                </div>
-                <span
-                  className={`text-xs font-medium ${
-                    getPasswordStrengthColor().split(" ")[1]
-                  }`}
-                >
-                  {getPasswordStrengthText()}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {name === "password" && uiState.showCapsLockWarning && isFocused && (
-            <div
-              className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 px-3 py-2 rounded-lg"
-              aria-live="polite"
-            >
-              <AlertTriangle className="w-4 h-4" />
-              <span>Caps Lock is on</span>
-            </div>
-          )}
-
-          {errorMessage && (
-            <p
-              id={`${name}-error`}
-              className="text-sm text-red-600 flex items-center gap-1"
-              aria-live="assertive"
-            >
-              <X className="w-4 h-4" />
-              {errorMessage}
-            </p>
-          )}
-        </div>
-      );
-    },
-    [
-      formData,
-      uiState,
-      handleInputChange,
-      getPasswordStrengthColor,
-      getPasswordStrengthText,
-      inputBaseClasses,
-      themeSpecificClasses,
-    ]
-  );
-
   return (
-    <div
-      className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-50 px-4 py-8`}
-    >
-      <div
-        className={`max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden transform hover:scale-[1.02] transition-all duration-500 hover:shadow-2xl`}
+    <div className={`min-h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-500 ${theme.bg}`}>
+      {/* Animated Background */}
+      <div className="absolute inset-0">
+        {isDarkMode && (
+          <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientVia} ${theme.gradientTo}`} />
+        )}
+        
+        {/* Animated orbs */}
+        <div className={`absolute top-1/4 left-1/4 w-[500px] h-[500px] ${theme.orbColor1} rounded-full blur-[120px] animate-pulse`} />
+        <div className={`absolute bottom-1/4 right-1/4 w-[400px] h-[400px] ${theme.orbColor2} rounded-full blur-[100px] animate-pulse`} style={{ animationDelay: '1s' }} />
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] ${theme.orbColor3} rounded-full blur-[80px]`} />
+        
+        {/* Grid pattern */}
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(${theme.gridColor} 1px, transparent 1px), linear-gradient(90deg, ${theme.gridColor} 1px, transparent 1px)`,
+            backgroundSize: '60px 60px'
+          }}
+        />
+        
+        {/* Floating particles */}
+        <div className={`absolute top-20 left-[15%] w-1.5 h-1.5 ${theme.particleColor} rounded-full animate-float`} />
+        <div className={`absolute top-40 right-[20%] w-1 h-1 ${theme.particleColor} rounded-full animate-float`} style={{ animationDelay: '0.5s' }} />
+        <div className={`absolute bottom-32 left-[25%] w-2 h-2 ${theme.particleColor} rounded-full animate-float`} style={{ animationDelay: '1s' }} />
+        <div className={`absolute bottom-20 right-[30%] w-1.5 h-1.5 ${theme.particleColor} rounded-full animate-float`} style={{ animationDelay: '1.5s' }} />
+      </div>
+
+      {/* Back to Home */}
+      <Link
+        to="/"
+        className={`absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 ${theme.textMuted} hover:${theme.text} transition-colors duration-300 group`}
       >
-        <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-8 py-8 text-white relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-r from-violet-600/90 via-purple-600/90 to-indigo-600/90 group-hover:from-violet-700/90 group-hover:via-purple-700/90 group-hover:to-indigo-700/90 transition-all duration-500"></div>
-          <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-110 transition-transform duration-500"></div>
-          <div className="absolute -bottom-2 -left-2 w-16 h-16 bg-white/10 rounded-full blur-lg group-hover:scale-110 transition-transform duration-500"></div>
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+        <span className="text-sm font-medium">Back to Home</span>
+      </Link>
 
-          <div className="absolute top-4 right-4 flex gap-2 z-20">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                uiState.isOnline ? "bg-green-500/20" : "bg-red-500/20"
-              }`}
+      {/* Theme Toggle & Network Status */}
+      <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
+        {/* Theme Toggle */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={toggleTheme}
+          className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all duration-300 ${
+            isDarkMode 
+              ? 'bg-white/10 border-white/20 hover:bg-white/20' 
+              : 'bg-white/80 border-violet-200 hover:bg-white shadow-sm'
+          }`}
+        >
+          {isDarkMode ? (
+            <Sun className="w-5 h-5 text-amber-400" />
+          ) : (
+            <Moon className="w-5 h-5 text-violet-600" />
+          )}
+        </motion.button>
+
+        {/* Network Status */}
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border ${
+          uiState.isOnline 
+            ? isDarkMode ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'
+            : isDarkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+        }`}>
+          <Globe className={`w-5 h-5 ${uiState.isOnline ? 'text-emerald-500' : 'text-red-500'}`} />
+        </div>
+      </div>
+
+      {/* Main Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="relative z-10 w-full max-w-md mx-4"
+      >
+        {/* Glass Card */}
+        <div className={`relative ${theme.cardBg} backdrop-blur-xl rounded-3xl border ${theme.cardBorder} shadow-2xl ${isDarkMode ? 'shadow-purple-500/10' : 'shadow-violet-200/50'} overflow-hidden transition-all duration-500`}>
+          {/* Top glow */}
+          <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent ${theme.topGlow} to-transparent`} />
+          
+          {/* Header */}
+          <div className="relative px-8 pt-10 pb-8">
+            {/* Logo */}
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex justify-center mb-6"
             >
-              <Globe
-                className={`w-4 h-4 ${
-                  uiState.isOnline ? "text-green-300" : "text-red-300"
-                }`}
-              />
-            </div>
-          </div>
-
-          <div className="absolute bottom-4 right-4 z-20">
-            <Link
-              to="/"
-              className="flex items-center gap-2 px-3 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white hover:bg-white/30 transition-all duration-300 transform hover:scale-105 group"
-              title="Back to Home"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-300" />
-              <Home className="w-4 h-4" />
-              <span className="text-sm font-medium">Home</span>
-            </Link>
-          </div>
-
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-300">
-                <LogIn className="w-6 h-6 text-white" />
+              <div className="relative">
+                <div className={`absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl blur-xl ${isDarkMode ? 'opacity-50' : 'opacity-30'}`} />
+                <img 
+                  src="/Yuvsiksha_logo.png" 
+                  alt="Yuvsiksha" 
+                  className="relative w-16 h-16 rounded-2xl"
+                />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold transform group-hover:scale-105 transition-transform duration-300">
-                  Welcome Back
-                </h1>
-                <p className="text-violet-200 text-sm">
-                  Sign in to continue learning
-                </p>
-              </div>
+            </motion.div>
+
+            {/* Title */}
+            <div className="text-center">
+              <h1 className={`text-2xl font-bold ${theme.text} mb-2`}>Welcome Back</h1>
+              <p className={`${theme.textMuted} text-sm`}>Sign in to continue your learning journey</p>
             </div>
 
             {uiState.lastLoginTime && (
-              <div className="text-violet-200 text-xs opacity-75">
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className={`text-center text-xs ${theme.textSubtle} mt-3`}
+              >
                 Last login: {uiState.lastLoginTime.toLocaleDateString()} at{" "}
-                {uiState.lastLoginTime.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
+                {uiState.lastLoginTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </motion.p>
             )}
           </div>
-        </div>
 
-        <div className="p-8 space-y-6">
-          {!uiState.isOnline && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-              <Globe className="w-5 h-5 text-red-500" />
-              <div>
-                <p className="text-red-800 font-medium text-sm">
-                  No internet connection
-                </p>
-                <p className="text-red-600 text-xs">
-                  Please check your connection and try again
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Form */}
+          <div className="px-8 pb-8 space-y-5">
+            {/* Error Messages */}
+            <AnimatePresence>
+              {!uiState.isOnline && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`flex items-center gap-3 p-4 rounded-xl ${theme.errorBg} border ${theme.errorBorder}`}
+                >
+                  <Globe className={`w-5 h-5 ${isDarkMode ? 'text-red-400' : 'text-red-500'}`} />
+                  <div>
+                    <p className={`${theme.errorText} font-medium text-sm`}>No internet connection</p>
+                    <p className={`${isDarkMode ? 'text-red-400/70' : 'text-red-500/70'} text-xs`}>Please check your connection</p>
+                  </div>
+                </motion.div>
+              )}
 
-          {uiState.isLocked && (
-            <div
-              className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3"
-              aria-live="assertive"
-            >
-              <Shield className="w-5 h-5 text-red-500" />
-              <div>
-                <p className="text-red-800 font-medium text-sm">
-                  Account temporarily locked
-                </p>
-                <p className="text-red-600 text-xs">
-                  Try again in {uiState.lockoutTime} seconds
-                </p>
-              </div>
-            </div>
-          )}
+              {uiState.isLocked && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`flex items-center gap-3 p-4 rounded-xl ${theme.errorBg} border ${theme.errorBorder}`}
+                >
+                  <Shield className={`w-5 h-5 ${isDarkMode ? 'text-red-400' : 'text-red-500'}`} />
+                  <div>
+                    <p className={`${theme.errorText} font-medium text-sm`}>Account temporarily locked</p>
+                    <p className={`${isDarkMode ? 'text-red-400/70' : 'text-red-500/70'} text-xs`}>Try again in {uiState.lockoutTime}s</p>
+                  </div>
+                </motion.div>
+              )}
 
-          {uiState.errorMessage && (
-            <div
-              className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3"
-              aria-live="assertive"
-            >
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <div>
-                <p className="text-red-800 font-medium text-sm">
-                  {uiState.errorMessage}
-                </p>
-                {uiState.loginAttempts > 0 && !uiState.isLocked && (
-                  <p className="text-red-600 text-xs">
-                    Attempts remaining: {3 - uiState.loginAttempts}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+              {uiState.errorMessage && !uiState.isLocked && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`flex items-center gap-3 p-4 rounded-xl ${theme.errorBg} border ${theme.errorBorder}`}
+                >
+                  <AlertTriangle className={`w-5 h-5 ${isDarkMode ? 'text-red-400' : 'text-red-500'}`} />
+                  <p className={`${theme.errorText} text-sm`}>{uiState.errorMessage}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <div className="space-y-3">
-            {/* Custom Google Button with Purple Gradient */}
-            <div className="w-full">
+            {/* Google Login */}
+            <div className="flex justify-center">
               <GoogleLogin
                 onSuccess={handleGoogleLogin}
-                onError={() => {
-                  setUiState((u) => ({
-                    ...u,
-                    errorMessage: "Google login failed",
-                  }));
-                }}
+                onError={() => setUiState((u) => ({ ...u, errorMessage: "Google login failed" }))}
                 useOneTap
-                theme="filled_blue"
+                theme={isDarkMode ? "filled_black" : "outline"}
                 size="large"
                 text="continue_with"
                 shape="pill"
-                width="100%"
-                render={({ onClick, disabled }) => (
-                  <button
-                    onClick={onClick}
-                    disabled={disabled || uiState.isSubmitting || uiState.isLocked || !uiState.isOnline}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white rounded-xl font-medium flex justify-center items-center space-x-3 transition-all duration-300 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Chrome className="w-5 h-5" />
-                    <span>Continue with Google</span>
-                  </button>
+                width={300}
+              />
+            </div>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className={`w-full border-t ${theme.dividerBorder}`} />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className={`px-4 ${theme.dividerBg} ${theme.textSubtle}`}>or continue with email</span>
+              </div>
+            </div>
+
+            {/* Email Input */}
+            <div className="space-y-2">
+              <label className={`flex items-center gap-2 text-sm font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <Mail className="w-4 h-4 text-violet-500" />
+                Email Address
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  onFocus={() => setUiState((u) => ({ ...u, focusedField: 'email' }))}
+                  onBlur={() => setUiState((u) => ({ ...u, focusedField: null }))}
+                  disabled={uiState.isLocked || uiState.isSubmitting}
+                  className={`w-full px-4 py-3.5 ${theme.inputBg} border rounded-xl ${theme.inputText} ${theme.inputPlaceholder} transition-all duration-300 focus:outline-none ${
+                    formData.email && !uiState.emailValid
+                      ? `border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/30`
+                      : formData.email && uiState.emailValid
+                      ? `${theme.successBorder} focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30`
+                      : `${theme.inputBorder} ${theme.inputFocusBorder} focus:ring-1 ${theme.inputFocusRing}`
+                  }`}
+                  placeholder="Enter your email"
+                />
+                {formData.email && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    {uiState.emailValid ? (
+                      <Check className={`w-5 h-5 ${theme.successIcon}`} />
+                    ) : (
+                      <X className="w-5 h-5 text-red-500" />
+                    )}
+                  </div>
                 )}
-              />
+              </div>
             </div>
 
-            {uiState.showBiometric && (
+            {/* Password Input */}
+            <div className="space-y-2">
+              <label className={`flex items-center gap-2 text-sm font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <Lock className="w-4 h-4 text-violet-500" />
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={uiState.showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  onFocus={() => setUiState((u) => ({ ...u, focusedField: 'password' }))}
+                  onBlur={() => setUiState((u) => ({ ...u, focusedField: null, showCapsLockWarning: false }))}
+                  disabled={uiState.isLocked || uiState.isSubmitting}
+                  className={`w-full px-4 py-3.5 pr-12 ${theme.inputBg} border rounded-xl ${theme.inputText} ${theme.inputPlaceholder} transition-all duration-300 focus:outline-none ${
+                    formData.password && !uiState.passwordValid
+                      ? `border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/30`
+                      : formData.password && uiState.passwordValid
+                      ? `${theme.successBorder} focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30`
+                      : `${theme.inputBorder} ${theme.inputFocusBorder} focus:ring-1 ${theme.inputFocusRing}`
+                  }`}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setUiState((u) => ({ ...u, showPassword: !u.showPassword }))}
+                  className={`absolute right-4 top-1/2 -translate-y-1/2 ${theme.textMuted} hover:text-violet-500 transition-colors`}
+                >
+                  {uiState.showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {/* Caps Lock Warning */}
+              <AnimatePresence>
+                {uiState.showCapsLockWarning && uiState.focusedField === 'password' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className={`flex items-center gap-2 text-amber-500 text-xs ${isDarkMode ? 'bg-amber-500/10' : 'bg-amber-50'} px-3 py-2 rounded-lg`}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Caps Lock is on
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  name="rememberMe"
+                  checked={formData.rememberMe}
+                  onChange={handleInputChange}
+                  className={`w-4 h-4 rounded ${theme.checkboxBorder} ${theme.checkboxBg} text-violet-500 focus:ring-violet-500/30 focus:ring-offset-0`}
+                />
+                <span className={`text-sm ${theme.textMuted} group-hover:${isDarkMode ? 'text-slate-300' : 'text-slate-700'} transition-colors`}>
+                  Remember me
+                </span>
+              </label>
               <button
-                onClick={() => handleSocialLogin("biometric")}
-                disabled={
-                  uiState.isSubmitting || uiState.isLocked || !uiState.isOnline
-                }
-                className="w-full py-3 px-4 border border-emerald-300 rounded-xl font-medium flex justify-center items-center space-x-3 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:border-emerald-400 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className={`text-sm ${theme.linkColor} ${theme.linkHover} transition-colors`}
               >
-                <Smartphone className="w-5 h-5 text-emerald-600" />
-                <span className="text-emerald-700">Use Biometric Login</span>
+                Forgot password?
               </button>
-            )}
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className={`w-full border-t border-slate-200`}></div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className={`px-4 bg-white text-slate-500 font-medium`}>
-                Or continue with email
-              </span>
-            </div>
-          </div>
 
-          {renderInput(
-            "Email Address",
-            "email",
-            "email",
-            <Mail className="w-4 h-4" />
-          )}
-          {renderInput(
-            "Password",
-            "password",
-            "password",
-            <Lock className="w-4 h-4" />,
-            true
-          )}
-
-          <div className="flex items-center justify-between">
-            <label className="flex items-center space-x-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                name="rememberMe"
-                checked={formData.rememberMe}
-                onChange={handleInputChange}
-                disabled={uiState.isLocked || uiState.isSubmitting}
-                className="w-4 h-4 text-violet-600 border-slate-300 rounded focus:ring-violet-500 transition-all duration-200 group-hover:scale-110"
-              />
-              <span
-                className={`text-sm text-slate-700 group-hover:text-violet-600 transition-colors duration-200`}
-              >
-                Remember me
-              </span>
-            </label>
-
-            <button
-              onClick={handleForgotPasswordClick}
-              className="text-sm text-violet-600 font-medium hover:text-violet-800 transition-all duration-200 hover:underline decoration-2 underline-offset-2 transform hover:scale-105"
+            {/* Submit Button */}
+            <motion.button
+              whileHover={{ scale: isFormValid && !uiState.isSubmitting ? 1.02 : 1 }}
+              whileTap={{ scale: isFormValid && !uiState.isSubmitting ? 0.98 : 1 }}
+              onClick={handleSubmit}
+              disabled={!isFormValid || uiState.isSubmitting}
+              className={`w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-300 ${
+                isFormValid && !uiState.isSubmitting
+                  ? 'bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30'
+                  : `${theme.disabledBg} ${theme.disabledText} cursor-not-allowed`
+              }`}
             >
-              Forgot password?
-            </button>
-          </div>
+              {uiState.isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Signing In...</span>
+                </>
+              ) : uiState.isLocked ? (
+                <>
+                  <Shield className="w-5 h-5" />
+                  <span>Account Locked ({uiState.lockoutTime}s)</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-5 h-5" />
+                  <span>Sign In</span>
+                </>
+              )}
+            </motion.button>
 
-          <button
-            onClick={handleSubmit}
-            disabled={!isFormValid || uiState.isSubmitting}
-            className={`w-full py-4 rounded-xl font-semibold flex justify-center items-center space-x-2 transition-all duration-300 transform ${
-              isFormValid && !uiState.isSubmitting
-                ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-2xl hover:scale-105 hover:-translate-y-1"
-                : "bg-slate-300 text-slate-500 cursor-not-allowed"
-            }`}
-          >
-            {uiState.isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Signing In...</span>
-              </>
-            ) : uiState.isLocked ? (
-              <>
-                <Shield className="w-5 h-5" />
-                <span>Account Locked</span>
-              </>
-            ) : !uiState.isOnline ? (
-              <>
-                <Globe className="w-5 h-5" />
-                <span>Offline</span>
-              </>
-            ) : (
-              <>
-                <LogIn className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-                <span>Sign In</span>
-              </>
-            )}
-          </button>
-
-          <div className={`text-center pt-4 border-t border-slate-200`}>
-            <p className={`text-sm text-slate-600`}>
-              Don't have an account?
+            {/* Sign Up Link */}
+            <p className={`text-center ${theme.textMuted} text-sm`}>
+              Don't have an account?{' '}
               <Link
                 to="/signup"
-                className="text-violet-600 font-medium hover:text-violet-800 transition-all duration-200 hover:underline decoration-2 underline-offset-2 transform hover:scale-105 ml-1"
+                className={`${theme.linkColor} ${theme.linkHover} font-medium transition-colors`}
               >
                 Sign up
               </Link>
             </p>
+
+            {/* Security Badge */}
+            <div className={`flex items-center justify-center gap-4 pt-4 border-t ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
+              <div className={`flex items-center gap-1.5 text-xs ${theme.textSubtle}`}>
+                <Shield className="w-3.5 h-3.5" />
+                <span>Secure Login</span>
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${theme.textSubtle}`}>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>SSL Protected</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

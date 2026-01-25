@@ -1,240 +1,89 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,400;1,500;1,600;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-/* Custom animations for the background effect */
+/* ===== Base Styles ===== */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ===== Animations ===== */
+
+/* Subtle float animation for background elements */
 @keyframes float {
   0%, 100% {
-    transform: translateY(0px) translateX(0px) scale(1);
-  }
-  25% {
-    transform: translateY(-20px) translateX(10px) scale(1.05);
+    transform: translateY(0px) scale(1);
   }
   50% {
-    transform: translateY(-10px) translateX(-15px) scale(0.95);
-  }
-  75% {
-    transform: translateY(-30px) translateX(5px) scale(1.02);
-  }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.1);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
+    transform: translateY(-20px) scale(1.02);
   }
 }
 
 .animate-float {
-  animation: float 6s ease-in-out infinite;
+  animation: float 8s ease-in-out infinite;
 }
 
 .animate-float-delayed {
-  animation: float 8s ease-in-out infinite;
-  animation-delay: 2s;
+  animation: float 10s ease-in-out infinite;
+  animation-delay: 3s;
 }
 
 .animate-float-slow {
-  animation: float 10s ease-in-out infinite;
-  animation-delay: 4s;
+  animation: float 12s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+/* Pulse animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .animate-pulse-glow {
   animation: pulse-glow 4s ease-in-out infinite;
 }
 
-.animate-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
-  background-size: 200% 100%;
-  animation: shimmer 3s infinite;
-}
-
-/* Video styling */
-.hero-video {
-  filter: brightness(0.7) contrast(1.1) saturate(1.2);
-}
-
-/* Enhanced glassmorphism */
-.glass {
-  backdrop-filter: blur(16px);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.glass-strong {
-  backdrop-filter: blur(20px) saturate(180%);
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-/* Button hover effects */
-.btn-gradient-hover {
-  background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
-  background-size: 300% 300%;
-  animation: gradient-shift 6s ease infinite;
-}
-
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Custom scrollbar */
+/* ===== Scrollbar Styling ===== */
 ::-webkit-scrollbar {
   width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #3b82f6, #8b5cf6);
+  background: linear-gradient(to bottom, #22d3ee, #3b82f6);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #2563eb, #7c3aed);
+  background: linear-gradient(to bottom, #06b6d4, #2563eb);
 }
 
-/* Text selection styling */
+/* ===== Selection Styling ===== */
 ::selection {
-  background: rgba(59, 130, 246, 0.3);
+  background: rgba(34, 211, 238, 0.3);
   color: inherit;
 }
 
-/* Particle animation */
-@keyframes particles {
-  0% {
-    transform: translate(0, 100vh) rotate(0deg);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate(0, -100vh) rotate(360deg);
-    opacity: 0;
-  }
+/* ===== Utility Classes ===== */
+
+/* Glassmorphism */
+.glass {
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-@keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes spin-reverse {
-  from {
-    transform: rotate(360deg);
-  }
-  to {
-    transform: rotate(0deg);
-  }
-}
-
-@keyframes scan {
-  0% {
-    transform: translateY(-100vh);
-  }
-  100% {
-    transform: translateY(100vh);
-  }
-}
-
-.animate-spin-slow {
-  animation: spin-slow 20s linear infinite;
-}
-
-.animate-spin-reverse {
-  animation: spin-reverse 25s linear infinite;
-}
-
-.animate-scan {
-  animation: scan 8s ease-in-out infinite;
-}
-
-.particle {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  background: linear-gradient(45deg, #60a5fa, #a78bfa);
-  border-radius: 50%;
-  animation: particles 15s linear infinite;
-  pointer-events: none;
-}
-
-.particle:nth-child(odd) {
-  background: linear-gradient(45deg, #34d399, #06b6d4);
-  animation-duration: 12s;
-}
-
-.particle:nth-child(3n) {
-  background: linear-gradient(45deg, #f472b6, #fbbf24);
-  animation-duration: 18s;
-}
-
-/* Responsive text scaling */
-@media (max-width: 640px) {
-  .hero-title {
-    font-size: 3rem !important;
-    line-height: 1.1 !important;
-  }
-  
-  .hero-subtitle {
-    font-size: 1rem !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .hero-title {
-    font-size: 2.5rem !important;
-  }
-}
-
-/* Loading animation for video */
-.video-loading {
-  position: relative;
-  overflow: hidden;
-}
-
-.video-loading::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  animation: shimmer 2s infinite;
-}
-
-/* Counter animation styles */
+/* Tabular numbers for counters */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
