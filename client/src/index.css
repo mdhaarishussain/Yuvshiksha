@@ -31,6 +31,11 @@ body {
   animation-delay: 3s;
 }
 
+.animate-float-slow {
+  animation: float 12s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
 /* Pulse animation */
 @keyframes pulse-glow {
   0%, 100% {

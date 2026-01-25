@@ -1,37 +1,79 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../../contexts/SocketContext';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { motion } from 'framer-motion';
 import {
-  MessageCircle,
-  Send,
-  Search,
-  ArrowLeft,
-  Check,
-  CheckCheck,
-  Clock,
-  Loader2
+  MessageCircle, Send, Search, ArrowLeft, Check, CheckCheck, Clock, Loader2, Sun, Moon, GraduationCap
 } from 'lucide-react';
 import axios from 'axios';
 import API_CONFIG from '../../config/api';
 import { getFromLocalStorage } from '../../utils/storage';
 
+// Theme configuration
+const getTheme = (isDark) => isDark ? {
+  pageBg: 'bg-[#0a0612]',
+  sidebarBg: 'bg-[#0f0a1a]/90',
+  chatBg: 'bg-[#0d0815]/80',
+  cardBg: 'bg-white/[0.03]',
+  cardBorder: 'border-white/10',
+  headerBg: 'bg-[#0f0a1a]/90',
+  text: 'text-white',
+  textMuted: 'text-slate-400',
+  textSubtle: 'text-slate-500',
+  inputBg: 'bg-white/[0.05]',
+  inputBorder: 'border-white/10',
+  inputText: 'text-white',
+  inputPlaceholder: 'placeholder-slate-500',
+  accentColor: 'text-violet-400',
+  accentBg: 'bg-violet-500/10',
+  ownMsgBg: 'bg-gradient-to-r from-violet-600 to-fuchsia-600',
+  otherMsgBg: 'bg-white/[0.05]',
+  otherMsgBorder: 'border-white/10',
+  hoverBg: 'hover:bg-white/[0.06]',
+  activeBg: 'bg-violet-500/10',
+  onlineColor: 'text-emerald-400',
+  offlineColor: 'text-red-400',
+  orbColor1: 'bg-violet-600/20',
+  orbColor2: 'bg-fuchsia-600/15',
+} : {
+  pageBg: 'bg-gradient-to-br from-slate-50 via-violet-50 to-purple-50',
+  sidebarBg: 'bg-white/90',
+  chatBg: 'bg-white/70',
+  cardBg: 'bg-white/80',
+  cardBorder: 'border-violet-100',
+  headerBg: 'bg-white/90',
+  text: 'text-slate-900',
+  textMuted: 'text-slate-600',
+  textSubtle: 'text-slate-500',
+  inputBg: 'bg-white',
+  inputBorder: 'border-violet-200',
+  inputText: 'text-slate-900',
+  inputPlaceholder: 'placeholder-slate-400',
+  accentColor: 'text-violet-600',
+  accentBg: 'bg-violet-100',
+  ownMsgBg: 'bg-gradient-to-r from-violet-600 to-fuchsia-600',
+  otherMsgBg: 'bg-white',
+  otherMsgBorder: 'border-violet-100',
+  hoverBg: 'hover:bg-violet-50',
+  activeBg: 'bg-violet-100',
+  onlineColor: 'text-emerald-600',
+  offlineColor: 'text-red-500',
+  orbColor1: 'bg-violet-300/30',
+  orbColor2: 'bg-fuchsia-300/20',
+};
+
 const Messages = () => {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('dashboardTheme');
+    return saved ? saved === 'dark' : true;
+  });
+  const theme = getTheme(isDarkMode);
+
   const { socket, isConnected } = useSocket();
   const location = useLocation();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
-
-  // Debug socket status
-  useEffect(() => {
-    console.log('🔍 Teacher Messages - Socket Debug:', {
-      socket: !!socket,
-      isConnected,
-      socketId: socket?.id,
-      socketConnected: socket?.connected,
-      socketUrl: socket?.io?.uri
-    });
-  }, [socket, isConnected]);
 
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -45,35 +87,31 @@ const Messages = () => {
   const messagesEndRef = useRef(null);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Get current user info from localStorage on component mount
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    localStorage.setItem('dashboardTheme', newTheme ? 'dark' : 'light');
+  };
+
   useEffect(() => {
     const user = getFromLocalStorage('currentUser');
-    if (user) {
-      setCurrentUser(user);
-    }
+    if (user) setCurrentUser(user);
   }, []);
 
-  // Load queued messages from localStorage on component mount
   useEffect(() => {
     const saved = localStorage.getItem('queuedMessages');
-    if (saved) {
-      setQueuedMessages(JSON.parse(saved));
-    }
+    if (saved) setQueuedMessages(JSON.parse(saved));
   }, []);
 
-  // Save queued messages to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('queuedMessages', JSON.stringify(queuedMessages));
   }, [queuedMessages]);
 
-  // Handle online/offline status changes
   useEffect(() => {
     if (isOnline && queuedMessages.length > 0) {
       sendQueuedMessages();
       fetchConversations();
-      if (selectedConversation) {
-        fetchMessages(selectedConversation.participant._id);
-      }
+      if (selectedConversation) fetchMessages(selectedConversation.participant._id);
     }
     if (!isOnline) {
       setShowOfflineNotice(true);
@@ -81,22 +119,19 @@ const Messages = () => {
     }
   }, [isOnline]);
 
-  // Send queued messages when online
   const sendQueuedMessages = async () => {
     if (!socket || !isConnected || queuedMessages.length === 0) return;
-
     for (const queuedMsg of queuedMessages) {
       try {
         socket.emit('send_message', queuedMsg);
         if (selectedConversation && queuedMsg.recipient === selectedConversation.participant._id) {
-          const localMessage = {
+          setMessages(prev => [...prev, {
             _id: 'temp_' + Date.now(),
             sender: { _id: currentUser._id },
             content: queuedMsg.content,
             createdAt: new Date(),
             isRead: false
-          };
-          setMessages(prev => [...prev, localMessage]);
+          }]);
         }
       } catch (error) {
         console.error('Error sending queued message:', error);
@@ -105,7 +140,6 @@ const Messages = () => {
     setQueuedMessages([]);
   };
 
-  // Handle incoming conversation from other sources (if any)
   useEffect(() => {
     const shouldStartConversation = location.state?.selectedStudentId;
     if (shouldStartConversation) {
@@ -113,15 +147,13 @@ const Messages = () => {
       const studentName = location.state.studentName;
       const studentAvatar = location.state.studentAvatar;
       if (conversations.length > 0) {
-        const existingConversation = conversations.find(
-          conv => conv.participant._id === studentId
-        );
+        const existingConversation = conversations.find(conv => conv.participant._id === studentId);
         if (existingConversation) {
           handleSelectConversation(existingConversation);
           return;
         }
       }
-      const mockConversation = {
+      setSelectedConversation({
         participant: {
           _id: studentId,
           firstName: studentName ? studentName.split(' ')[0] : 'Student',
@@ -130,100 +162,55 @@ const Messages = () => {
         },
         lastMessage: { content: 'Start a conversation', createdAt: new Date() },
         unreadCount: 0
-      };
-      setSelectedConversation(mockConversation);
+      });
       setNewMessage(`Hello ${studentName || 'there'}, I'm ready to help you with your studies!`);
     }
   }, [location.state, conversations, currentUser]);
 
-  // Fetch conversations
   useEffect(() => {
-    if (currentUser) {
-      fetchConversations();
-    }
+    if (currentUser) fetchConversations();
   }, [currentUser]);
 
-  // Socket event listeners
   useEffect(() => {
     if (socket && isConnected && currentUser) {
       const handleNewMessage = (message) => {
-        console.log('📨 Teacher received new message:', message);
-        
-        // Don't add the message if current user is the sender (they already have it from optimistic update)
         if (message.sender._id === currentUser._id) {
-          console.log('📨 Teacher: Ignoring own message from server to avoid duplicate');
-          // Still refresh conversations to update last message display
           fetchConversations();
           return;
         }
-        
-        // Only add messages from other users (incoming messages)
-        if (selectedConversation && 
-            message.sender._id === selectedConversation.participant._id && 
-            message.recipient._id === currentUser._id) {
+        if (selectedConversation && message.sender._id === selectedConversation.participant._id && message.recipient._id === currentUser._id) {
           setMessages(prev => {
-            // Avoid duplicates by checking if message already exists
             const exists = prev.find(m => m._id === message._id);
-            if (!exists) {
-              return [...prev, message];
-            }
-            return prev;
+            return !exists ? [...prev, message] : prev;
           });
         }
-        // Always refresh conversations to update last message
         fetchConversations();
       };
-      
+
       const handleMessageSent = (sentMessage) => {
-        console.log('✅ Teacher message sent confirmation:', sentMessage);
         setMessages(prev => prev.map(msg =>
-          (msg.content === sentMessage.content && msg.status === 'sending') ||
-          (msg._id && msg._id.toString().startsWith('temp_'))
+          (msg.content === sentMessage.content && msg.status === 'sending') || msg._id?.toString().startsWith('temp_')
             ? { ...msg, _id: sentMessage._id, status: 'sent', createdAt: sentMessage.createdAt }
             : msg
         ));
       };
-      
-      const handleMessageNotification = (notification) => {
-        console.log('🔔 Teacher message notification:', notification);
-        fetchConversations();
-      };
 
-      // Handle new conversation creation
-      const handleNewConversation = (conversationData) => {
-        console.log('🆕 Teacher: New conversation created:', conversationData);
-        // Add the new conversation to the top of the list
+      const handleMessageNotification = () => fetchConversations();
+      const handleNewConversation = (data) => {
         setConversations(prev => {
-          const exists = prev.find(conv => conv.participant._id === conversationData.participant._id);
-          if (!exists) {
-            return [conversationData, ...prev];
-          }
-          return prev.map(conv => 
-            conv.participant._id === conversationData.participant._id 
-              ? { ...conv, ...conversationData }
-              : conv
-          );
+          const exists = prev.find(conv => conv.participant._id === data.participant._id);
+          if (!exists) return [data, ...prev];
+          return prev.map(conv => conv.participant._id === data.participant._id ? { ...conv, ...data } : conv);
         });
       };
 
-      // Handle user online/offline status
-      const handleUserOnline = (userId) => {
-        console.log('👤 Teacher: User came online:', userId);
-        setConversations(prev => prev.map(conv => 
-          conv.participant._id === userId 
-            ? { ...conv, participant: { ...conv.participant, isOnline: true } }
-            : conv
-        ));
-      };
+      const handleUserOnline = (userId) => setConversations(prev => prev.map(conv =>
+        conv.participant._id === userId ? { ...conv, participant: { ...conv.participant, isOnline: true } } : conv
+      ));
 
-      const handleUserOffline = (userId) => {
-        console.log('👤 Teacher: User went offline:', userId);
-        setConversations(prev => prev.map(conv => 
-          conv.participant._id === userId 
-            ? { ...conv, participant: { ...conv.participant, isOnline: false } }
-            : conv
-        ));
-      };
+      const handleUserOffline = (userId) => setConversations(prev => prev.map(conv =>
+        conv.participant._id === userId ? { ...conv, participant: { ...conv.participant, isOnline: false } } : conv
+      ));
 
       socket.on('new_message', handleNewMessage);
       socket.on('message_sent', handleMessageSent);
@@ -243,7 +230,6 @@ const Messages = () => {
     }
   }, [socket, isConnected, selectedConversation, currentUser]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -252,29 +238,20 @@ const Messages = () => {
     if (!currentUser) return;
     try {
       setLoading(true);
-      // FIX: Removed manual token from headers
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/messages/conversations`, {
-        withCredentials: true // CRITICAL: This sends the HttpOnly cookie
-      });
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/messages/conversations`, { withCredentials: true });
       setConversations(response.data);
       setLoading(false);
     } catch (error) {
-      console.error('❌ Error fetching conversations:', error.response?.status, error.response?.data);
+      console.error('Error fetching conversations:', error.response?.status, error.response?.data);
       setLoading(false);
-      // Optional: Redirect on 401
-      if (error.response?.status === 401) {
-        navigate('/login', { replace: true });
-      }
+      if (error.response?.status === 401) navigate('/login', { replace: true });
     }
   };
 
   const fetchMessages = async (participantId) => {
     if (!currentUser) return;
     try {
-      // FIX: Removed manual token from headers
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/messages/conversation/${participantId}`, {
-        withCredentials: true // CRITICAL: This sends the HttpOnly cookie
-      });
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/messages/conversation/${participantId}`, { withCredentials: true });
       setMessages(response.data);
       if (socket && currentUser) {
         const roomId = [currentUser._id, participantId].sort().join('_');
@@ -282,16 +259,12 @@ const Messages = () => {
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
-      // Optional: Redirect on 401
-      if (error.response?.status === 401) {
-        navigate('/login', { replace: true });
-      }
+      if (error.response?.status === 401) navigate('/login', { replace: true });
     }
   };
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || sendingMessage) return;
-
     setSendingMessage(true);
     const tempId = 'temp_' + Date.now();
     const messageData = {
@@ -311,61 +284,40 @@ const Messages = () => {
       isRead: false,
       status: 'sending'
     };
-    
-    // Immediately show the message in UI
+
     setMessages(prev => [...prev, localMessage]);
     setNewMessage('');
 
     try {
       if (socket && isConnected && isOnline) {
-        // Use socket for real-time messaging
-        console.log('📤 Teacher sending message via socket:', messageData);
         socket.emit('send_message', messageData);
-        
-        // The backend socket handler will save to database and emit to all connected users
       } else {
-        // Fallback to API only if socket is not available
-        console.log('📤 Teacher sending message via API (socket not available)');
-        const apiResponse = await axios.post(
-          `${API_CONFIG.BASE_URL}/api/messages/send`,
-          messageData,
-          { withCredentials: true }
-        );
-        setMessages(prev => prev.map(msg =>
-          msg._id === tempId
-            ? { ...msg, _id: apiResponse.data._id, status: 'sent', createdAt: apiResponse.data.createdAt }
-            : msg
-        ));
+        const apiResponse = await axios.post(`${API_CONFIG.BASE_URL}/api/messages/send`, messageData, { withCredentials: true });
+        setMessages(prev => prev.map(msg => msg._id === tempId ? { ...msg, _id: apiResponse.data._id, status: 'sent', createdAt: apiResponse.data.createdAt } : msg));
         fetchConversations();
       }
     } catch (error) {
-      console.error('❌ Teacher error sending message:', error);
-      setMessages(prev => prev.map(msg =>
-        msg._id === tempId ? { ...msg, status: 'queued' } : msg
-      ));
+      console.error('Error sending message:', error);
+      setMessages(prev => prev.map(msg => msg._id === tempId ? { ...msg, status: 'queued' } : msg));
       setQueuedMessages(prev => [...prev, messageData]);
       if (!isOnline) {
         setShowOfflineNotice(true);
         setTimeout(() => setShowOfflineNotice(false), 3000);
       }
-      if (error.response?.status === 401) {
-        navigate('/login', { replace: true });
-      }
+      if (error.response?.status === 401) navigate('/login', { replace: true });
     } finally {
       setSendingMessage(false);
     }
   };
 
   const handleSelectConversation = (conversation) => {
-    setConversations(prevConversations =>
-      prevConversations.map(conv =>
-        conv.participant._id === conversation.participant._id ? { ...conv, unreadCount: 0 } : conv
-      )
-    );
+    setConversations(prev => prev.map(conv =>
+      conv.participant._id === conversation.participant._id ? { ...conv, unreadCount: 0 } : conv
+    ));
     setSelectedConversation(conversation);
     fetchMessages(conversation.participant._id);
   };
-  
+
   const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const formatDate = (date) => {
     const messageDate = new Date(date);
@@ -384,211 +336,214 @@ const Messages = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-purple-600 animate-spin" />
+      <div className={`min-h-screen ${theme.pageBg} flex items-center justify-center`}>
+        <Loader2 className="w-12 h-12 text-violet-500 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50">
+    <div className={`min-h-screen ${theme.pageBg} transition-colors duration-500`}>
+      {/* Background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className={`absolute -top-40 -right-40 w-96 h-96 ${theme.orbColor1} rounded-full blur-[120px] animate-pulse`} />
+        <div className={`absolute -bottom-40 -left-40 w-80 h-80 ${theme.orbColor2} rounded-full blur-[100px] animate-pulse`} style={{ animationDelay: '1s' }} />
       </div>
+
       <div className="relative z-10 h-screen flex">
-        {/* Conversations Sidebar */}
-        <div className={`${selectedConversation ? 'hidden lg:flex' : 'flex'} w-full lg:w-1/3 xl:w-1/4 flex-col bg-white/90 backdrop-blur-xl border-r-2 border-purple-200/50 shadow-2xl relative`}>
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-50/80 via-indigo-50/60 to-purple-50/80 rounded-l-none"></div>
-          <div className="relative z-10 p-4 border-b-2 border-purple-200/30 bg-white/50 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-3">
-              <Link
-                to="/teacher/dashboard"
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-md text-sm font-medium"
-                title="Go to Dashboard"
-              >
+        {/* Sidebar */}
+        <div className={`${selectedConversation ? 'hidden lg:flex' : 'flex'} w-full lg:w-1/3 xl:w-1/4 flex-col ${theme.sidebarBg} backdrop-blur-xl border-r ${theme.cardBorder}`}>
+          {/* Sidebar Header */}
+          <div className={`p-4 border-b ${theme.cardBorder} ${theme.headerBg} backdrop-blur-sm`}>
+            <div className="flex items-center justify-between mb-4">
+              <Link to="/teacher/dashboard" className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl hover:shadow-lg hover:shadow-violet-500/25 transition-all text-sm font-medium">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
               </Link>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+                  <span className={`text-xs font-medium ${isOnline ? theme.onlineColor : theme.offlineColor}`}>
+                    {isOnline ? "Online" : "Offline"}
+                  </span>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleTheme}
+                  className={`p-2 rounded-xl border transition-all ${isDarkMode ? 'bg-white/[0.05] border-white/10 hover:bg-white/[0.1]' : 'bg-white border-violet-200 hover:bg-violet-50'}`}
+                >
+                  {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-violet-600" />}
+                </motion.button>
+              </div>
             </div>
-            <div className="mb-4 text-center">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-700 to-indigo-700 bg-clip-text text-transparent">
-                Messages
-              </h1>
-            </div>
+
+            <h1 className={`text-2xl font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent mb-4`}>Messages</h1>
+
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.textSubtle} w-5 h-5`} />
               <input
                 type="text"
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-white/80 border-2 border-purple-200/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 shadow-sm"
+                className={`w-full pl-10 pr-4 py-3 ${theme.inputBg} border ${theme.inputBorder} rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 ${theme.inputText} ${theme.inputPlaceholder} transition-all`}
               />
             </div>
           </div>
+
+          {/* Offline Notice */}
           {(showOfflineNotice || (!isOnline && queuedMessages.length > 0)) && (
-            <div className="relative z-10 p-3 bg-gradient-to-r from-orange-100 to-yellow-100 border-l-4 border-orange-500">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-orange-600" />
-                <span className="text-sm font-medium text-orange-800">
-                  {!isOnline && queuedMessages.length > 0
-                    ? `${queuedMessages.length} message(s) queued - will send when online`
-                    : "You're offline - messages will be queued"}
+            <div className="p-3 bg-amber-500/10 border-l-4 border-amber-500">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-500" />
+                <span className={`text-sm font-medium ${theme.textMuted}`}>
+                  {!isOnline && queuedMessages.length > 0 ? `${queuedMessages.length} message(s) queued` : "You're offline"}
                 </span>
               </div>
             </div>
           )}
-          <div className="relative z-10 flex-1 overflow-y-auto bg-white/20 backdrop-blur-sm">
+
+          {/* Conversations List */}
+          <div className="flex-1 overflow-y-auto">
             {filteredConversations.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/25">
                   <MessageCircle className="w-8 h-8 text-white" />
                 </div>
-                <p className="text-slate-700 font-medium text-lg mb-2">No conversations yet</p>
-                <p className="text-sm text-slate-600">Students will appear here when they message you</p>
+                <p className={`${theme.text} font-medium text-lg mb-2`}>No conversations yet</p>
+                <p className={`text-sm ${theme.textSubtle}`}>Students will appear here when they message you</p>
               </div>
             ) : (
               filteredConversations.map((conversation) => (
-                <div
+                <motion.div
                   key={conversation.participant._id}
+                  whileHover={{ scale: 1.01 }}
                   onClick={() => handleSelectConversation(conversation)}
-                  className={`p-4 border-b border-purple-100/50 cursor-pointer transition-all duration-200 hover:bg-white/40 hover:shadow-md ${
-                    selectedConversation?.participant._id === conversation.participant._id
-                      ? 'bg-purple-100/60 border-l-4 border-l-purple-500 shadow-sm'
-                      : ''
+                  className={`p-4 border-b ${theme.cardBorder} cursor-pointer transition-all ${theme.hoverBg} ${
+                    selectedConversation?.participant._id === conversation.participant._id ? `${theme.activeBg} border-l-4 border-l-violet-500` : ""
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-md">
-                      {conversation.participant.firstName.charAt(0)}
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-full flex items-center justify-center text-white font-semibold shadow-lg shadow-violet-500/25">
+                        {conversation.participant.firstName.charAt(0)}
+                      </div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 ${conversation.participant.isOnline ? 'bg-emerald-500' : 'bg-slate-400'} border-2 ${isDarkMode ? 'border-[#0f0a1a]' : 'border-white'} rounded-full`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-slate-800 truncate">
+                        <p className={`text-sm font-semibold ${theme.text} truncate`}>
                           {conversation.participant.firstName} {conversation.participant.lastName}
-                        </h3>
-                        <span className="text-xs text-slate-500">
-                          {formatTime(conversation.lastMessage.createdAt)}
-                        </span>
+                        </p>
+                        <span className={`text-xs ${theme.textSubtle}`}>{formatTime(conversation.lastMessage.createdAt)}</span>
                       </div>
-                      <p className="text-sm text-slate-600 truncate">
-                        {conversation.lastMessage.content}
-                      </p>
-                      {conversation.unreadCount > 0 && (
-                        <span className="inline-block bg-purple-500 text-white text-xs rounded-full px-2 py-1 mt-1">
-                          {conversation.unreadCount}
-                        </span>
-                      )}
+                      <div className="flex items-center justify-between mt-1">
+                        <p className={`text-sm ${theme.textMuted} truncate`}>{conversation.lastMessage.content}</p>
+                        {conversation.unreadCount > 0 && (
+                          <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center font-medium">
+                            {conversation.unreadCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))
             )}
           </div>
         </div>
+
         {/* Chat Area */}
-        <div className={`${selectedConversation ? 'flex' : 'hidden lg:flex'} flex-1 flex-col bg-white/60 backdrop-blur-xl relative`}>
+        <div className={`${selectedConversation ? 'flex' : 'hidden lg:flex'} flex-1 flex-col ${theme.chatBg} backdrop-blur-sm`}>
           {selectedConversation ? (
             <>
-              <div className="p-4 border-b border-purple-200/30 bg-white/40 backdrop-blur-sm flex items-center space-x-4">
-                <button
-                  onClick={() => setSelectedConversation(null)}
-                  className="lg:hidden p-2 rounded-lg hover:bg-white/60 transition-colors duration-200"
-                >
-                  <ArrowLeft className="w-5 h-5 text-slate-700" />
-                </button>
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-                  {selectedConversation.participant.firstName.charAt(0)}
-                </div>
-                <div>
-                  <h2 className="font-semibold text-slate-800">
-                    {selectedConversation.participant.firstName} {selectedConversation.participant.lastName}
-                  </h2>
-                  <p className="text-sm text-slate-600">Student</p>
-                  {/* Online/Offline status */}
-                  <span className={`flex items-center gap-1 text-xs font-medium ${selectedConversation.participant.isOnline ? 'text-green-600' : 'text-red-600'}`}>
-                    <span className={`w-2 h-2 rounded-full ${selectedConversation.participant.isOnline ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                    {selectedConversation.participant.isOnline ? 'Online' : 'Offline'}
-                  </span>
+              {/* Chat Header */}
+              <div className={`p-4 ${theme.headerBg} backdrop-blur-sm border-b ${theme.cardBorder} flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setSelectedConversation(null)} className={`lg:hidden p-2 ${theme.hoverBg} rounded-xl transition-colors`}>
+                    <ArrowLeft className={`w-5 h-5 ${theme.textMuted}`} />
+                  </button>
+                  <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-full flex items-center justify-center text-white font-semibold shadow-lg shadow-violet-500/25">
+                    {selectedConversation.participant.firstName.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold ${theme.text}`}>
+                      {selectedConversation.participant.firstName} {selectedConversation.participant.lastName}
+                    </h3>
+                    <p className={`text-sm ${selectedConversation.participant.isOnline ? theme.onlineColor : theme.offlineColor}`}>
+                      {selectedConversation.participant.isOnline ? 'Online' : 'Offline'}
+                    </p>
+                  </div>
                 </div>
               </div>
+
+              {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((message, index) => {
                   const currentUserId = currentUser?._id || currentUser?.id;
                   const messageSenderId = message.sender?._id || message.sender?.id;
                   const isOwnMessage = messageSenderId === currentUserId;
                   const showDate = index === 0 || formatDate(message.createdAt) !== formatDate(messages[index - 1].createdAt);
+
                   return (
                     <div key={message._id}>
                       {showDate && (
                         <div className="text-center my-4">
-                          <span className="bg-white/70 backdrop-blur-sm px-3 py-1 rounded-full text-xs text-gray-600">
+                          <span className={`${theme.cardBg} backdrop-blur-sm px-3 py-1 rounded-full text-xs ${theme.textSubtle} border ${theme.cardBorder}`}>
                             {formatDate(message.createdAt)}
                           </span>
                         </div>
                       )}
-                      <div className={`flex items-end gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                        {/* Incoming message avatar */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex items-end gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                      >
                         {!isOwnMessage && (
-                          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-                            {selectedConversation?.participant?.firstName?.[0]}
-                            {selectedConversation?.participant?.lastName?.[0]}
+                          <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md">
+                            {selectedConversation?.participant?.firstName?.[0]}{selectedConversation?.participant?.lastName?.[0]}
                           </div>
                         )}
-                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl shadow-md transition-colors duration-200 ${
-                          isOwnMessage
-                            ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-br-md'
-                            : 'bg-white text-gray-900 rounded-bl-md border border-purple-100'
+                        <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-lg ${
+                          isOwnMessage ? `${theme.ownMsgBg} text-white rounded-br-sm` : `${theme.otherMsgBg} ${theme.text} border ${theme.otherMsgBorder} rounded-bl-sm`
                         }`}>
                           <p className="text-sm break-words">{message.content}</p>
-                          <div className={`flex items-center mt-1 space-x-1 ${
-                            isOwnMessage ? 'justify-end text-white' : 'justify-start text-gray-500'
-                          }`}>
+                          <div className={`flex items-center mt-1 gap-1 ${isOwnMessage ? 'justify-end text-white/70' : `justify-start ${theme.textSubtle}`}`}>
                             <span className="text-xs">{formatTime(message.createdAt)}</span>
                             {isOwnMessage && (
-                              message.status === 'queued' ? (
-                                <Clock className="w-3 h-3 text-orange-400" title="Queued - will send when online" />
-                              ) : message.isRead ? (
-                                <CheckCheck className="w-3 h-3" />
-                              ) : (
-                                <Check className="w-3 h-3" />
-                              )
+                              message.status === 'queued' ? <Clock className="w-3 h-3 text-amber-300" />
+                              : message.isRead ? <CheckCheck className="w-3 h-3" />
+                              : <Check className="w-3 h-3" />
                             )}
                           </div>
                         </div>
-                        {/* Outgoing message avatar space for alignment */}
                         {isOwnMessage && <div className="w-8 h-8" />}
-                      </div>
+                      </motion.div>
                     </div>
                   );
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="p-4 bg-white/60 backdrop-blur-sm border-t border-white/20">
-                <div className="flex items-end space-x-3">
-                  <div className="flex-1">
-                    <textarea
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          sendMessage();
-                        }
-                      }}
-                      placeholder="Type your message..."
-                      className="w-full px-4 py-3 bg-white/80 border-2 border-purple-200/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 resize-none shadow-sm"
-                      rows={1}
-                      style={{ minHeight: '44px', maxHeight: '120px' }}
-                    />
-                  </div>
+
+              {/* Message Input */}
+              <div className={`p-4 ${theme.headerBg} backdrop-blur-sm border-t ${theme.cardBorder}`}>
+                <div className="flex items-end gap-3">
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                    placeholder="Type your message..."
+                    className={`w-full px-4 py-3 ${theme.inputBg} border ${theme.inputBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500 ${theme.inputText} ${theme.inputPlaceholder} resize-none transition-all`}
+                    rows={1}
+                    style={{ minHeight: '48px', maxHeight: '120px' }}
+                  />
                   <button
                     onClick={sendMessage}
                     disabled={!newMessage.trim() || sendingMessage}
-                    className="p-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                    className="p-3.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-2xl hover:shadow-lg hover:shadow-violet-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Send className="w-5 h-5" />
+                    {sendingMessage ? <Clock className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
@@ -596,11 +551,11 @@ const Messages = () => {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
-                  <MessageCircle className="w-12 h-12 text-white" />
+                <div className="w-20 h-20 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-violet-500/25">
+                  <MessageCircle className="w-10 h-10 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">Welcome to Messages</h2>
-                <p className="text-slate-600">Select a conversation to start messaging with your students</p>
+                <h3 className={`text-xl font-semibold ${theme.text} mb-2`}>Welcome to Messages</h3>
+                <p className={theme.textMuted}>Select a conversation to start messaging with your students</p>
               </div>
             </div>
           )}
